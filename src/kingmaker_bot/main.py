@@ -4,7 +4,12 @@ import os
 from pathlib import Path
 
 from kingmaker_bot.application.weather_service import WeatherService
-from kingmaker_bot.database import SQLiteCampaignStateRepository, SQLiteWeatherRepository
+from kingmaker_bot.application.predict_weather_service import PredictWeatherService
+from kingmaker_bot.database import (
+    SQLiteCampaignStateRepository,
+    SQLitePredictionRepository,
+    SQLiteWeatherRepository,
+)
 from kingmaker_bot.discord_client import create_bot
 from kingmaker_bot.weather import KingmakerStolenLandsProfile, PROFILE_ID, WeatherEngine
 
@@ -22,7 +27,11 @@ def main() -> None:
     weather_repository = SQLiteWeatherRepository(database_path)
     weather_engine = WeatherEngine(KingmakerStolenLandsProfile())
     weather_service = WeatherService(weather_repository, {PROFILE_ID: weather_engine})
-    create_bot(campaign_repository, weather_service).run(token)
+    prediction_repository = SQLitePredictionRepository(database_path)
+    prediction_service = PredictWeatherService(
+        prediction_repository, weather_service, profile_id=PROFILE_ID
+    )
+    create_bot(campaign_repository, weather_service, prediction_service).run(token)
 
 
 if __name__ == "__main__":

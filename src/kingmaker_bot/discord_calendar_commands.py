@@ -1,16 +1,25 @@
 """Discord command adapter for campaign calendar operations."""
 
+import re
+
 import discord
 from discord import app_commands
 
 from kingmaker_bot.application.calendar_service import CalendarService
 from kingmaker_bot.calendar import CalendarDate
 from kingmaker_bot.application.weather_service import WeatherService
+from kingmaker_bot.application.predict_weather_service import PredictWeatherService
 from kingmaker_bot.discord_weather_formatter import format_weather
+from kingmaker_bot.discord_prediction_formatter import format_prediction
+from kingmaker_bot.prediction import (
+    PredictionAlreadyAttemptedError,
+    PredictionConditions,
+)
 from kingmaker_bot.weather import PROFILE_ID
 
 _CALENDAR_NOT_CONFIGURED = "No campaign calendar is configured for this server."
 _GUILD_ONLY_MESSAGE = "Calendar commands can only be used in a server."
+_SURVIVAL_TOTAL_MESSAGE = "Survival check total must be an integer."
 
 
 def format_calendar_date(date: CalendarDate) -> str:
@@ -25,10 +34,83 @@ async def _guild_id_or_respond(interaction: discord.Interaction) -> int | None:
     return interaction.guild_id
 
 
+class PredictWeatherModal(discord.ui.Modal, title="Predict Weather"):
+    """Collect a final Survival total, then delegate prediction to the service."""
+
+    survival_total = discord.ui.TextInput(
+        label="Survival check total",
+        placeholder="Final total only; do not enter the die result",
+        required=True,
+        max_length=12,
+    )
+
+    def __init__(
+        self,
+        calendar_service: CalendarService,
+        prediction_service: PredictWeatherService,
+        conditions: PredictionConditions,
+    ) -> None:
+        super().__init__(timeout=300)
+        self._calendar_service = calendar_service
+        self._prediction_service = prediction_service
+        self._conditions = conditions
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        raw_total = self.survival_total.value.strip()
+        if re.fullmatch(r"[+-]?\d+", raw_total) is None:
+            await interaction.response.send_message(_SURVIVAL_TOTAL_MESSAGE, ephemeral=True)
+            return
+        try:
+            total = int(raw_total)
+        except ValueError:
+            await interaction.response.send_message(_SURVIVAL_TOTAL_MESSAGE, ephemeral=True)
+            return
+
+        guild_id = interaction.guild_id
+        if guild_id is None:
+            await interaction.response.send_message(_GUILD_ONLY_MESSAGE, ephemeral=True)
+            return
+        state = self._calendar_service.get_campaign_state(guild_id)
+        if state is None:
+            await interaction.response.send_message(_CALENDAR_NOT_CONFIGURED, ephemeral=True)
+            return
+        if state.party_level is None:
+            await interaction.response.send_message(
+                "No party level is configured. Ask the GM to set it with /calendar level <level>.",
+                ephemeral=True,
+            )
+            return
+
+        try:
+            attempt = self._prediction_service.predict(
+                guild_id=guild_id,
+                user_id=interaction.user.id,
+                current_date=state.current_date,
+                party_level=state.party_level,
+                survival_total=total,
+                conditions=self._conditions,
+            )
+        except PredictionAlreadyAttemptedError:
+            await interaction.response.send_message(
+                "You have already attempted Predict Weather for this campaign date.",
+                ephemeral=True,
+            )
+            return
+        except Exception:
+            await interaction.response.send_message(
+                "The prediction could not be completed. Please try again later.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.send_message(format_prediction(attempt), ephemeral=True)
+
+
 def register_calendar_commands(
     tree: app_commands.CommandTree,
     service: CalendarService,
     weather_service: WeatherService | None = None,
+    prediction_service: PredictWeatherService | None = None,
 ) -> app_commands.Group:
     """Register a guild-only ``/calendar`` command group on a command tree."""
     group = app_commands.Group(
@@ -144,6 +226,45 @@ def register_calendar_commands(
             )
             return
         await interaction.response.send_message(format_weather(revealed.weather))
+
+    @group.command(name="predict", description="Predict weather for the coming day")
+    @app_commands.choices(
+        conditions=[
+            app_commands.Choice(name="Commanding view — DC 15", value=PredictionConditions.COMMANDING_VIEW.value),
+            app_commands.Choice(name="Normal conditions — DC 20", value=PredictionConditions.NORMAL.value),
+            app_commands.Choice(name="Poor conditions / visibility — DC 30", value=PredictionConditions.POOR.value),
+        ]
+    )
+    async def predict(
+        interaction: discord.Interaction,
+        conditions: app_commands.Choice[str],
+    ) -> None:
+        guild_id = await _guild_id_or_respond(interaction)
+        if guild_id is None:
+            return
+        state = service.get_campaign_state(guild_id)
+        if state is None:
+            await interaction.response.send_message(_CALENDAR_NOT_CONFIGURED, ephemeral=True)
+            return
+        if state.party_level is None:
+            await interaction.response.send_message(
+                "No party level is configured. Ask the GM to set it with /calendar level <level>.",
+                ephemeral=True,
+            )
+            return
+        if prediction_service is None:
+            await interaction.response.send_message(
+                "Predict Weather is temporarily unavailable.", ephemeral=True
+            )
+            return
+        try:
+            selected_conditions = PredictionConditions(conditions.value)
+        except ValueError:
+            await interaction.response.send_message("Choose a valid prediction condition.", ephemeral=True)
+            return
+        await interaction.response.send_modal(
+            PredictWeatherModal(service, prediction_service, selected_conditions)
+        )
 
     tree.add_command(group)
     return group
