@@ -4,6 +4,8 @@ services:
       context: .
       dockerfile: Dockerfile
     working_dir: /workspace
+    env_file:
+      - .env
     environment:
       PYTHONPATH: /workspace/src
     volumes:

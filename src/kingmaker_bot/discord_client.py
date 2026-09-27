@@ -3,13 +3,16 @@
 import discord
 from discord import app_commands
 
+from kingmaker_bot.application.calendar_service import CalendarService
 from kingmaker_bot.application.health import ping_response
+from kingmaker_bot.campaign import CampaignStateRepository
+from kingmaker_bot.discord_calendar_commands import register_calendar_commands
 
 
 class KingmakerClient(discord.Client):
     """Discord transport adapter for the campaign application."""
 
-    def __init__(self) -> None:
+    def __init__(self, repository: CampaignStateRepository) -> None:
         super().__init__(intents=discord.Intents.default())
         self.tree = app_commands.CommandTree(self)
 
@@ -17,10 +20,12 @@ class KingmakerClient(discord.Client):
         async def ping(interaction: discord.Interaction) -> None:
             await interaction.response.send_message(ping_response())
 
+        register_calendar_commands(self.tree, CalendarService(repository))
+
     async def setup_hook(self) -> None:
         await self.tree.sync()
 
 
-def create_bot() -> KingmakerClient:
-    """Create the Discord client and register its application commands."""
-    return KingmakerClient()
+def create_bot(repository: CampaignStateRepository) -> KingmakerClient:
+    """Create the Discord client using an application-provided repository."""
+    return KingmakerClient(repository)
