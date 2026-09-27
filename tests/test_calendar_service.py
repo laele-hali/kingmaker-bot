@@ -119,3 +119,29 @@ def test_guilds_remain_isolated(service: CalendarService) -> None:
 
     assert service.get_campaign_state(101).current_date == CalendarDate(2, 1, 4712)
     assert service.get_campaign_state(202).current_date == CalendarDate(15, 6, 4713)
+
+
+def test_party_level_can_be_absent_and_set_without_changing_date(service: CalendarService) -> None:
+    initial = service.set_date(101, 1, 1, 4712)
+    assert initial.party_level is None
+
+    configured = service.set_party_level(101, 8)
+    assert configured is not None
+    assert configured.party_level == 8
+    assert configured.current_date == initial.current_date
+
+
+@pytest.mark.parametrize("level", [0, 21, -1, True])
+def test_rejects_invalid_party_level(service: CalendarService, level: int) -> None:
+    service.set_date(101, 1, 1, 4712)
+    with pytest.raises(ValueError):
+        service.set_party_level(101, level)
+
+
+def test_party_level_is_guild_scoped(service: CalendarService) -> None:
+    service.set_date(101, 1, 1, 4712)
+    service.set_date(202, 1, 1, 4712)
+    service.set_party_level(101, 4)
+
+    assert service.get_campaign_state(101).party_level == 4
+    assert service.get_campaign_state(202).party_level is None

@@ -17,7 +17,22 @@ class CalendarService:
     def set_date(self, guild_id: int, day: int, month: int, year: int) -> CampaignState:
         """Create or update a guild calendar date after domain validation."""
         current_date = CalendarDate(day=day, month=month, year=year)
-        return self._repository.save(CampaignState(guild_id=guild_id, current_date=current_date))
+        existing = self._repository.get(guild_id)
+        return self._repository.save(CampaignState(
+            guild_id=guild_id, current_date=current_date,
+            party_level=None if existing is None else existing.party_level,
+        ))
+
+    def set_party_level(self, guild_id: int, party_level: int) -> CampaignState | None:
+        """Set party level on an already configured campaign."""
+        if not isinstance(party_level, int) or isinstance(party_level, bool) or not 1 <= party_level <= 20:
+            raise ValueError("Party level must be between 1 and 20.")
+        state = self._repository.get(guild_id)
+        if state is None:
+            return None
+        return self._repository.save(CampaignState(
+            guild_id=guild_id, current_date=state.current_date, party_level=party_level,
+        ))
 
     def advance(self, guild_id: int, days: int) -> CampaignState | None:
         """Advance a configured guild's calendar, returning ``None`` if absent."""
@@ -26,4 +41,6 @@ class CalendarService:
             return None
 
         next_date = state.current_date.advance(days)
-        return self._repository.save(CampaignState(guild_id=guild_id, current_date=next_date))
+        return self._repository.save(CampaignState(
+            guild_id=guild_id, current_date=next_date, party_level=state.party_level,
+        ))

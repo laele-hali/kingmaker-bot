@@ -18,12 +18,19 @@ class CampaignState:
     current_date: CalendarDate
     created_at: datetime = field(default_factory=_utc_now)
     updated_at: datetime = field(default_factory=_utc_now)
+    party_level: int | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.guild_id, int) or isinstance(self.guild_id, bool) or self.guild_id < 1:
             raise ValueError("guild_id must be a positive integer")
         if not isinstance(self.current_date, CalendarDate):
             raise TypeError("current_date must be a CalendarDate")
+        if self.party_level is not None and (
+            not isinstance(self.party_level, int)
+            or isinstance(self.party_level, bool)
+            or not 1 <= self.party_level <= 20
+        ):
+            raise ValueError("party_level must be an integer from 1 to 20")
 
         for name in ("created_at", "updated_at"):
             value = getattr(self, name)

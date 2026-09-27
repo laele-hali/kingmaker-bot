@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import pytest
 
 from kingmaker_bot.calendar import CalendarDate
+from kingmaker_bot.application.calendar_service import CalendarService
 from kingmaker_bot.campaign import CampaignState
 from kingmaker_bot.database import SQLiteCampaignStateRepository
 
@@ -95,6 +96,52 @@ def test_invalid_stored_date_is_rejected_by_calendar_model(repository, database_
 
     with pytest.raises(ValueError):
         repository.get(1001)
+
+
+def test_existing_pre_party_level_schema_migrates_without_losing_campaign(tmp_path) -> None:
+    import sqlite3
+
+    path = tmp_path / "legacy.sqlite3"
+    with sqlite3.connect(path) as connection:
+        connection.execute("""CREATE TABLE campaign_state (
+            guild_id INTEGER PRIMARY KEY, current_day INTEGER NOT NULL,
+            current_month INTEGER NOT NULL, current_year INTEGER NOT NULL,
+            created_at TEXT NOT NULL, updated_at TEXT NOT NULL)""")
+        stamp = datetime.now(timezone.utc).isoformat()
+        connection.execute(
+            "INSERT INTO campaign_state VALUES (?, ?, ?, ?, ?, ?)",
+            (91, 29, 2, 4712, stamp, stamp),
+        )
+
+    migrated = SQLiteCampaignStateRepository(path)
+
+    loaded = migrated.get(91)
+    assert loaded is not None
+    assert loaded.current_date == CalendarDate(29, 2, 4712)
+    assert loaded.party_level is None
+    migrated.initialize()
+    assert migrated.get(91) == loaded
+
+
+def test_party_level_persists_and_date_updates_preserve_it(repository) -> None:
+    service = CalendarService(repository)
+    service.set_date(1001, 1, 1, 4712)
+    service.set_party_level(1001, 5)
+
+    service.advance(1001, 1)
+    assert repository.get(1001).party_level == 5
+    assert repository.get(1001).current_date == CalendarDate(2, 1, 4712)
+
+    service.set_date(1001, 3, 1, 4712)
+    assert repository.get(1001).party_level == 5
+
+
+def test_guild_party_levels_are_isolated(repository) -> None:
+    repository.save(CampaignState(1001, CalendarDate(1, 1, 4712), party_level=3))
+    repository.save(CampaignState(2002, CalendarDate(1, 1, 4712), party_level=7))
+
+    assert repository.get(1001).party_level == 3
+    assert repository.get(2002).party_level == 7
 
 
 def sqlite3_connection(database_path):

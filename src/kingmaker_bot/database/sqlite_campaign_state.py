@@ -30,6 +30,9 @@ class SQLiteCampaignStateRepository:
                 )
                 """
             )
+            columns = {row[1] for row in connection.execute("PRAGMA table_info(campaign_state)")}
+            if "party_level" not in columns:
+                connection.execute("ALTER TABLE campaign_state ADD COLUMN party_level INTEGER")
 
     def get(self, guild_id: int) -> CampaignState | None:
         """Return persisted state for a guild, or ``None`` if it is unknown."""
@@ -41,7 +44,7 @@ class SQLiteCampaignStateRepository:
             row = connection.execute(
                 """
                 SELECT guild_id, current_day, current_month, current_year,
-                       created_at, updated_at
+                       created_at, updated_at, party_level
                 FROM campaign_state
                 WHERE guild_id = ?
                 """,
@@ -62,6 +65,7 @@ class SQLiteCampaignStateRepository:
             current_date=current_date,
             created_at=datetime.fromisoformat(row["created_at"]),
             updated_at=datetime.fromisoformat(row["updated_at"]),
+            party_level=row["party_level"],
         )
 
     def save(self, state: CampaignState) -> CampaignState:
@@ -74,14 +78,16 @@ class SQLiteCampaignStateRepository:
             connection.row_factory = sqlite3.Row
             connection.execute("BEGIN IMMEDIATE")
             existing = connection.execute(
-                "SELECT created_at, updated_at FROM campaign_state WHERE guild_id = ?",
+                "SELECT created_at, updated_at, party_level FROM campaign_state WHERE guild_id = ?",
                 (state.guild_id,),
             ).fetchone()
 
             if existing is None:
                 created_at = state.created_at
+                party_level = state.party_level
             else:
                 created_at = datetime.fromisoformat(existing["created_at"])
+                party_level = state.party_level
                 previous_update = datetime.fromisoformat(existing["updated_at"])
                 if now <= previous_update:
                     now = previous_update + timedelta(microseconds=1)
@@ -90,13 +96,14 @@ class SQLiteCampaignStateRepository:
                 """
                 INSERT INTO campaign_state (
                     guild_id, current_day, current_month, current_year,
-                    created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?)
+                    created_at, updated_at, party_level
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(guild_id) DO UPDATE SET
                     current_day = excluded.current_day,
                     current_month = excluded.current_month,
                     current_year = excluded.current_year,
-                    updated_at = excluded.updated_at
+                    updated_at = excluded.updated_at,
+                    party_level = excluded.party_level
                 """,
                 (
                     state.guild_id,
@@ -105,6 +112,7 @@ class SQLiteCampaignStateRepository:
                     state.current_date.year,
                     created_at.isoformat(),
                     now.isoformat(),
+                    party_level,
                 ),
             )
 
@@ -113,4 +121,5 @@ class SQLiteCampaignStateRepository:
             current_date=state.current_date,
             created_at=created_at,
             updated_at=now,
+            party_level=party_level,
         )
