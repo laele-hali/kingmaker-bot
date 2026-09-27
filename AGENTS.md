@@ -1,65 +1,743 @@
-# Kingmaker Bot Development Guidelines
+# AGENTS.md
 
-## Environment
+## Project Overview
 
-This project is developed using Docker.
+This repository contains a Discord bot for Pathfinder 2e campaign
+management.
 
-Project dependencies should be installed inside the Docker development environment rather than directly onto the host.
+The initial target campaign is Kingmaker, with development focused on:
 
-Use:
+- Golarion calendar tracking
+- Persistent campaign state
+- Stolen Lands weather generation
+- Weather history
+- Predict Weather support
 
-    docker compose run --rm dev bash
+The architecture should remain sufficiently generic that the calendar,
+weather engine, and campaign services can later support other Pathfinder
+2e campaigns, regions, climate profiles, and external interfaces.
 
-for development commands.
+Do not expand the implementation into future features unless they are
+explicitly part of the current task.
 
-## Python
+---
 
-Python 3.12 is the project target.
+## Development Environment
+
+Development is performed using Docker.
+
+Use the project's Docker development environment when running Python,
+tests, or project tooling.
+
+The project currently targets:
+
+- Python 3.12
+- discord.py
+- pytest
+- SQLite
+- Docker / Docker Compose
+
+The repository is mounted into the development container at:
+
+    /workspace
+
+The source package is located at:
+
+    /workspace/src
+
+Run tests using:
+
+    docker compose run --rm dev pytest
+
+Do not introduce additional dependencies unless they provide a clear
+benefit and are required by the current task.
+
+Prefer Python standard-library functionality where practical.
+
+---
+
+## Project Structure
+
+The project separates external interfaces from application and game
+logic.
+
+Current and planned responsibilities are:
+
+    src/kingmaker_bot/
+        application/
+            Application-level use cases and orchestration.
+
+        calendar/
+            Golarion calendar domain logic.
+
+        database/
+            Persistence implementations and database infrastructure.
+
+        services/
+            Coordination between domain logic, repositories, and
+            external interfaces.
+
+        weather/
+            Weather domain models, weather profiles, and generation
+            logic.
+
+        discord_client.py
+            Discord integration.
+
+        main.py
+            Application entry point.
+
+Discord-specific code must not contain core calendar, weather, or
+Pathfinder rules logic.
+
+Domain logic should remain independently testable without connecting to
+Discord.
+
+---
+
+## Development Principles
+
+Prefer simple, explicit implementations over unnecessary abstraction.
+
+However, maintain boundaries where they protect known future
+requirements.
+
+In particular:
+
+- Keep Discord separate from game logic.
+- Keep persistence separate from domain logic.
+- Keep calendar logic independent of campaign-specific rules.
+- Keep weather generation independent of Discord.
+- Keep weather rules configurable through weather profiles.
+- Keep external integrations outside the core domain.
+
+Do not prematurely implement speculative features.
+
+Future requirements documented in this file should influence
+architecture where appropriate, but should not automatically become
+part of the current implementation.
+
+---
 
 ## Testing
 
-Use pytest for automated tests.
+Use pytest.
 
-Run tests with:
+New domain, persistence, service, and application behaviour should have
+automated tests.
 
-    pytest
+Tests should cover normal behaviour as well as important boundaries and
+invalid input.
 
-Tests should be added alongside new application/game logic.
+Bug fixes should normally include a regression test.
 
-## Architecture
+Run the complete test suite before considering a task complete.
 
-Keep Discord-specific command handling separate from application and game logic.
+Do not modify existing tests merely to make an incorrect implementation
+pass.
 
-Game rules and campaign logic should live in services and data modules rather than directly inside Discord command modules.
+If a test expectation is discovered to be incorrect, explain why before
+changing it.
 
-Prefer small, testable functions over large command handlers.
-
-## Database
-
-The project currently uses SQLite.
-
-Database access should be kept behind an appropriate abstraction so the storage implementation can be changed later if necessary.
-
-Do not commit database files to Git.
-
-## Pathfinder Rules
-
-The weather and calendar systems implement the Pathfinder 2e Kingmaker rules supplied by the project owner.
-
-Do not invent, silently alter, or simplify game rules.
-
-If optional behaviour differs from the published rules, make it explicitly configurable.
+---
 
 ## Git
 
-Do not create commits unless explicitly instructed.
+Do not create Git commits unless explicitly instructed to do so.
 
-Do not modify Git configuration.
+Do not push changes unless explicitly instructed.
 
-## General
+Do not commit:
 
-Prefer simple solutions over unnecessary abstractions.
+- SQLite database files
+- .env files
+- Discord tokens
+- credentials
+- generated caches
+- local virtual environments
 
-Do not add dependencies unless they are actually required.
+Before completing a coding task, report:
 
-Before making substantial changes, inspect the existing code and preserve the established project structure where practical.
+- Files created
+- Files modified
+- Tests run
+- Test results
+- Any design decisions or unresolved issues
+
+---
+
+## Configuration and Secrets
+
+Secrets must not be stored in source code.
+
+The Discord bot token and any future credentials should be supplied
+through environment variables or another external configuration
+mechanism.
+
+Local configuration containing credentials must remain excluded from
+Git.
+
+---
+
+# Domain Requirements
+
+## Golarion Calendar
+
+The calendar domain represents the Golarion calendar using Absalom
+Reckoning.
+
+It is not a Kingmaker-specific calendar.
+
+Calendar code must not depend on:
+
+- Kingmaker
+- The Stolen Lands
+- Discord
+- weather generation
+- campaign persistence
+- a specific campaign or guild
+
+The calendar should be usable independently by other Pathfinder
+campaigns and future interfaces.
+
+### Months
+
+The calendar uses the following months:
+
+1. Abadius - 31 days
+2. Calistril - 28 days normally, 29 in a leap year
+3. Pharast - 31 days
+4. Gozran - 30 days
+5. Desnus - 31 days
+6. Sarenith - 30 days
+7. Erastus - 31 days
+8. Arodus - 31 days
+9. Rova - 30 days
+10. Lamashan - 31 days
+11. Neth - 30 days
+12. Kuthona - 31 days
+
+### Leap Years
+
+The project uses an eight-year leap cycle.
+
+A year is a leap year when it is evenly divisible by 8.
+
+Examples:
+
+    4704 - leap year
+    4708 - not a leap year
+    4710 - not a leap year
+    4712 - leap year
+    4720 - leap year
+
+Do not substitute Gregorian leap-year rules.
+
+### Weekdays
+
+The weekdays are:
+
+1. Moonday
+2. Toilday
+3. Wealday
+4. Oathday
+5. Fireday
+6. Starday
+7. Sunday
+
+The weekday epoch used by this project is:
+
+    1 Abadius, 1 AR = Moonday
+
+### Seasons
+
+Seasons are:
+
+Spring:
+- Pharast
+- Gozran
+- Desnus
+
+Summer:
+- Sarenith
+- Erastus
+- Arodus
+
+Autumn:
+- Rova
+- Lamashan
+- Neth
+
+Winter:
+- Kuthona
+- Abadius
+- Calistril
+
+---
+
+## Campaign State
+
+Campaign state is scoped by Discord guild ID.
+
+Different Discord guilds must have independent campaign state.
+
+An unknown guild must not silently receive an arbitrary default
+campaign date.
+
+A campaign should be explicitly configured before campaign-dependent
+commands operate on it.
+
+Initial campaign state will include at minimum:
+
+- Discord guild ID
+- Current Golarion date
+
+Party level will be required by weather generation and may become part
+of campaign state when needed.
+
+Future campaign configuration may include:
+
+- Party level
+- Region
+- Weather profile
+- Terrain or current location
+- Weather mode
+
+Do not implement future campaign fields merely because they are listed
+here.
+
+Region and weather profile are separate concepts.
+
+For example:
+
+    region_id = "stolen_lands"
+    weather_profile_id = "kingmaker_stolen_lands"
+
+This distinction should be preserved when those features are eventually
+implemented.
+
+---
+
+## Persistence
+
+SQLite is the initial persistence implementation.
+
+Use Python's standard sqlite3 module unless a future requirement
+provides a compelling reason to change this.
+
+Database access should be isolated behind repository or persistence
+interfaces so that application and domain code do not depend directly
+on SQLite.
+
+Database paths should be configurable.
+
+Tests involving SQLite should use temporary test databases rather than
+the development database.
+
+Schema initialisation should be safe and idempotent.
+
+Database files must not be committed to Git.
+
+Do not introduce an ORM or migration framework unless explicitly
+required.
+
+---
+
+# Weather
+
+## Weather Architecture
+
+Weather generation must be profile-driven.
+
+Do not make the global weather engine synonymous with Kingmaker or the
+Stolen Lands.
+
+The first supported weather profile will implement the published
+Kingmaker Stolen Lands weather procedure.
+
+Conceptually:
+
+    WeatherService
+        |
+        +-- WeatherProfile
+                |
+                +-- KingmakerStolenLandsWeatherProfile
+                |
+                +-- future profiles
+
+The exact class structure does not need to match this example if a
+simpler implementation provides the same separation.
+
+The important requirement is that Kingmaker-specific probabilities and
+rules do not become global assumptions throughout the application.
+
+---
+
+## Weather Profiles
+
+A weather profile defines how weather is generated for a particular
+ruleset or climate model.
+
+The initial profile is:
+
+    kingmaker_stolen_lands
+
+Future profiles may represent:
+
+- Other published Pathfinder regions
+- Cold climates
+- Temperate climates
+- Arid climates
+- Tropical climates
+- Custom campaign climates
+- Derived climate models
+
+Do not implement these future profiles until explicitly requested.
+
+Official published rules and custom or derived weather models must
+remain distinguishable.
+
+The application must never represent a custom or statistically derived
+weather profile as an official Pathfinder rule.
+
+---
+
+## Kingmaker Weather
+
+The initial weather implementation will follow the Stolen Lands weather
+procedure supplied for the project.
+
+It includes:
+
+- Seasonal precipitation checks
+- Winter temperature checks
+- Significant weather-event checks
+- Weather-event selection
+- Party-level restrictions for hazards
+- Secondary events where applicable
+- Terrain restrictions where applicable
+
+Do not invent, reinterpret, or silently modify Pathfinder or Kingmaker
+rules.
+
+If a required rule is ambiguous or missing, stop and ask rather than
+making up behaviour.
+
+Avoid reproducing substantial copyrighted Pathfinder or Kingmaker rules
+text in source files or public documentation.
+
+Store only the rules data and descriptions necessary for the software
+to function.
+
+---
+
+## Weather Generation
+
+Weather generation should operate on an explicit date.
+
+Conceptually:
+
+    generate_weather(
+        date,
+        weather_profile,
+        party_level,
+        ...
+    )
+
+Do not design weather generation so that it can operate only on the
+campaign's current date.
+
+This is required because forecasting may need weather to be generated
+for a future date.
+
+Weather generation must remain deterministic with respect to a stored
+weather result:
+
+Once weather has been generated and persisted for a campaign and date,
+normal application operations must retrieve that weather rather than
+silently generating a different result.
+
+Explicit GM/admin reroll functionality may be added later.
+
+---
+
+## Weather Persistence
+
+Weather will eventually be persisted by campaign and Golarion date.
+
+A stored weather record should retain enough information to explain the
+generated result and support future weather history.
+
+Weather must be capable of existing in the database without having been
+revealed to players.
+
+Conceptually a weather record will eventually distinguish:
+
+    generated weather
+    generated_at
+    revealed_at
+
+where `revealed_at` may be null.
+
+This allows weather to be generated by forecasting without exposing the
+actual result.
+
+A forecast must never alter, replace, or reroll the actual stored
+weather.
+
+Do not implement weather persistence until it is part of the current
+development task.
+
+---
+
+## Weather History
+
+Generated weather should eventually form a historical campaign weather
+dataset.
+
+Requesting weather for a previously generated campaign date should
+return the stored result.
+
+Historical data may later be used for:
+
+- Campaign weather history
+- GM review
+- Statistical analysis
+- Designing derived climate profiles
+
+Do not introduce analytics or climate modelling until explicitly
+requested.
+
+---
+
+## Natural Weather Mode
+
+A possible future feature is an optional natural-weather mode.
+
+This may introduce limited continuity between consecutive days so that
+weather does not behave as a completely independent series of rolls.
+
+This behaviour is not part of the initial RAW Kingmaker implementation.
+
+Any mode that changes the published weather-generation procedure must be
+clearly configurable and distinguishable from the RAW implementation.
+
+Do not implement natural-weather behaviour until explicitly requested.
+
+---
+
+# Predict Weather
+
+The project will eventually support the Pathfinder 2e Predict Weather
+feat.
+
+The planned Discord command is:
+
+    /calendar predict
+
+The command should open an interaction asking the player for their
+Survival check total.
+
+The player performs the Survival roll themselves.
+
+The bot uses the supplied result to determine the appropriate forecast.
+
+Prediction rules should be implemented in application/domain services,
+not directly inside the Discord command.
+
+---
+
+## Prediction Behaviour
+
+A prediction must be based on the actual weather generated for the
+forecast period.
+
+If required weather has not yet been generated:
+
+1. Generate the actual weather.
+2. Persist it without revealing it.
+3. Generate the player's forecast from that stored weather.
+
+If weather already exists:
+
+1. Retrieve the existing weather.
+2. Use it as the basis of the prediction.
+
+Prediction must never cause actual weather to be rerolled.
+
+The player-facing forecast should reveal only the information permitted
+by the prediction result.
+
+A failed or misleading prediction must not expose the true weather or
+the hidden degree of success.
+
+Where practical, the Discord response should be private/ephemeral to
+the player making the prediction.
+
+---
+
+## Prediction Usage
+
+The system should eventually support the Predict Weather feat's usage
+restrictions, including tracking attempts where necessary.
+
+Prediction history may eventually include:
+
+- Campaign/guild
+- Player or Discord user
+- Date prediction was made
+- Date or period being forecast
+- Submitted Survival total
+- Degree of success
+- Creation timestamp
+
+Do not implement prediction history until required.
+
+Do not store character sheets or Survival modifiers merely to support
+this feature unless a future requirement explicitly requires them.
+
+---
+
+# Discord Interface
+
+Discord commands are an interface to the application.
+
+Discord handlers should:
+
+1. Validate Discord-specific input.
+2. Call application/service functionality.
+3. Format the returned result for Discord.
+
+They should not implement core game rules.
+
+Planned calendar interactions include:
+
+    /calendar date
+    /calendar set
+    /calendar advance
+    /calendar weather
+    /calendar predict
+
+Exact command syntax and Discord UI may evolve during implementation.
+
+Do not implement planned commands until they are part of the current
+task.
+
+---
+
+# Future External Integrations
+
+The project may eventually support interfaces other than Discord,
+including VTT or d20-related integrations.
+
+Core services must therefore not require Discord objects to function.
+
+The intended dependency direction is:
+
+    Discord --------\
+                     \
+    Future VTT -------> Application Services
+                     /         |
+    Future Web -----/          +-- Calendar
+                               +-- Campaign State
+                               +-- Weather
+                               +-- Prediction
+                               +-- Persistence
+
+External integrations should adapt their input into application-level
+operations.
+
+Do not add VTT, d20, web API, or other external integrations until
+explicitly requested.
+
+---
+
+# Future Regional Support
+
+The long-term architecture may support weather configuration by
+Golarion region.
+
+Region and climate/weather profile must remain separate.
+
+A region may select a default weather profile, but the underlying
+weather engine should not require a hard-coded relationship between the
+two.
+
+The Stolen Lands will be the initial supported region because it is
+required by the Kingmaker campaign.
+
+Future regional or climate profiles may be based on:
+
+- Published Pathfinder rules
+- General Pathfinder environmental rules
+- Explicit campaign configuration
+- Statistically derived models based on generated weather history
+
+Derived or custom models must be clearly labelled as such.
+
+Do not implement a global region database or climate system during the
+initial Kingmaker development.
+
+---
+
+# Current Development Strategy
+
+Develop incrementally.
+
+The intended development order is:
+
+1. Project and Docker foundation
+2. Golarion calendar domain
+3. Campaign persistence
+4. Basic Discord calendar commands
+5. Kingmaker/Stolen Lands weather engine
+6. Weather persistence
+7. Predict Weather support
+8. Weather history and GM/admin functionality
+9. Optional future regional/climate support
+10. Optional future external integrations
+
+Complete and test each stage before expanding into the next.
+
+The presence of a future feature in this document is not permission to
+implement it during an earlier stage.
+
+Avoid speculative abstractions that make the current implementation
+harder to understand.
+
+At the same time, do not knowingly couple current code to Kingmaker,
+Discord, or SQLite where an established project requirement says that
+component should remain independent.
+
+---
+
+# Coding Agent Behaviour
+
+Before making changes:
+
+1. Read this file.
+2. Inspect the existing repository.
+3. Understand the current implementation and tests.
+4. Limit work to the requested task.
+
+When implementing:
+
+- Prefer small, understandable changes.
+- Preserve existing working behaviour.
+- Reuse existing domain models.
+- Add tests alongside new behaviour.
+- Do not silently change established game rules.
+- Do not implement unrelated future features.
+- Do not add unnecessary dependencies.
+- Do not commit or push unless explicitly instructed.
+
+If requirements conflict or a Pathfinder rule needed for implementation
+is unclear, report the ambiguity rather than inventing an answer.
+
+When finished:
+
+1. Run the complete test suite in Docker.
+2. Report test results.
+3. List files created or modified.
+4. Summarise important implementation decisions.
+5. Report anything that remains unresolved.
