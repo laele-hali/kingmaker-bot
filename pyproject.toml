@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kingmaker-bot"
+version = "0.1.0"
+description = "Discord bot for Pathfinder 2e Kingmaker campaign management"
+requires-python = ">=3.12"
+dependencies = [
+    "discord.py>=2.4,<3"
+]
+
+[project.scripts]
+kingmaker-bot = "kingmaker_bot.main:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8,<9"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

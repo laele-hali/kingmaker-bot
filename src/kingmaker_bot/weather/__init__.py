@@ -1,0 +1,1 @@
+"""Future campaign weather functionality."""

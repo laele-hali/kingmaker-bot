@@ -1,0 +1,12 @@
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /workspace
+    environment:
+      PYTHONPATH: /workspace/src
+    volumes:
+      - .:/workspace
+    stdin_open: true
+    tty: true
