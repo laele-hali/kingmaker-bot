@@ -12,6 +12,7 @@ from kingmaker_bot.application.predict_weather_service import PredictWeatherServ
 from kingmaker_bot.discord_weather_formatter import format_weather
 from kingmaker_bot.discord_prediction_formatter import format_prediction
 from kingmaker_bot.discord_weather_view import RevealWeatherView
+from kingmaker_bot.discord_calendar_view import RewindCalendarView
 from kingmaker_bot.prediction import (
     PredictionAlreadyAttemptedError,
     PredictionWeatherRevealedError,
@@ -155,11 +156,22 @@ def register_calendar_commands(
             return
 
         try:
+            target = CalendarDate(day, month, year)
+            existing = service.get_campaign_state(guild_id)
+            if existing is not None and service.is_rewind(existing, target):
+                view = RewindCalendarView(service, existing, target, interaction.user.id)
+                await interaction.response.send_message(view.confirmation, view=view, ephemeral=True)
+                return
             state = service.set_date(guild_id, day, month, year)
         except ValueError:
             await interaction.response.send_message(
                 "Enter a valid Golarion date with a positive year, a month from 1 to 12, "
                 "and a day that exists in that month.", ephemeral=True
+            )
+            return
+        except Exception:
+            await interaction.response.send_message(
+                "The campaign date could not be changed. Please try again later.", ephemeral=True
             )
             return
         await interaction.response.send_message(

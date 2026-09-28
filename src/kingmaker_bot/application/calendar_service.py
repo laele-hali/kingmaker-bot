@@ -34,6 +34,18 @@ class CalendarService:
             guild_id=guild_id, current_date=state.current_date, party_level=party_level,
         ))
 
+    @staticmethod
+    def is_rewind(state: CampaignState, target: CalendarDate) -> bool:
+        """Compare chronologically (CalendarDate fields are day-first)."""
+        current = state.current_date
+        return (target.year, target.month, target.day) < (current.year, current.month, current.day)
+
+    def rewind(self, expected: CampaignState, target: CalendarDate) -> CampaignState:
+        """Apply a confirmed rewind only while its campaign snapshot is current."""
+        if not self.is_rewind(expected, target):
+            raise ValueError("rewind target must precede the current date")
+        return self._repository.rewind(expected, target)
+
     def advance(self, guild_id: int, days: int) -> CampaignState | None:
         """Advance a configured guild's calendar, returning ``None`` if absent."""
         state = self._repository.get(guild_id)

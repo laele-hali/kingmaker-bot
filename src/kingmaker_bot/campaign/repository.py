@@ -2,7 +2,13 @@
 
 from typing import Protocol
 
+from kingmaker_bot.calendar import CalendarDate
+
 from kingmaker_bot.campaign.state import CampaignState
+
+
+class StaleCampaignStateError(Exception):
+    """The campaign changed after a rewind was requested."""
 
 
 class CampaignStateRepository(Protocol):
@@ -14,4 +20,8 @@ class CampaignStateRepository(Protocol):
 
     def save(self, state: CampaignState) -> CampaignState:
         """Create or update a guild's campaign state and return persisted state."""
+        ...
+
+    def rewind(self, expected: CampaignState, target: CalendarDate) -> CampaignState:
+        """Atomically discard the timeline from target and update unchanged state."""
         ...

@@ -21,6 +21,13 @@ the current task explicitly requests a behavioral change:
 - The first actual-weather reveal is deliberate and requires confirmation.
 - Public Discord output shows results/gameplay information, not generation machinery.
 - Future history/reporting must never expose hidden or unrevealed weather.
+- Since v1.0.1, backwards `/calendar set` requires private, invoking-user-only
+  confirmation. A confirmed rewind atomically removes weather and prediction
+  state on/after the target date and updates the campaign date. Predictions
+  are removed if either their campaign date or forecast date reaches that
+  boundary. Earlier data, other guilds, and party level are preserved.
+  Forward/same-date setting and opening/cancelling/expiring a prompt do not
+  delete data. Any intervening campaign save invalidates a rewind prompt.
 
 Weather history and reporting are future work, not implemented core features.
 

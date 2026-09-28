@@ -45,6 +45,16 @@ Months 1–12 are Abadius, Calistril, Pharast, Gozran, Desnus, Sarenith, Erastus
 
 **Command access:** The bot does not enforce GM-only permissions. Agree who uses date, level, and weather commands. Confirmed weather is posted publicly in the invoking channel; choose the channel deliberately. Even in a restricted channel, confirming marks the day's weather revealed for the whole campaign and prevents further predictions.
 
+### Correcting the campaign date
+
+Setting a later date or setting the current date again preserves weather and predictions.
+
+Setting an earlier date opens a private warning with **Set Date** and **Cancel**. Confirming permanently removes weather and Predict Weather data **on and after the target date**, including any earlier prediction forecasting one of those days. Earlier weather and predictions wholly before that date remain intact. Party level is preserved.
+
+For example, rewinding to 17 Pharast removes weather and predictions for 17 Pharast and later; weather through 16 Pharast remains. The target day can receive fresh Predict Weather attempts and fresh actual weather. Advancing again does not reuse discarded future weather.
+
+Only the invoking user can confirm or cancel. Opening the warning, cancelling, or letting its five-minute timeout expire changes nothing. If campaign settings change while the warning is open, including another date set or party-level change, run `/calendar set` again for a fresh confirmation. Confirmed date changes are announced publicly. Previously posted Discord messages are not removed.
+
 ### Deliberately reveal actual weather
 
 The confirmation prevents accidental disclosure of the actual weather. The public report shows results and relevant gameplay information, not how the bot generated them.

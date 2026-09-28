@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.1
+
+Bugfix release for campaign-date rewinds.
+
+- Backwards `/calendar set` now requires a private, invoking-user-only confirmation.
+- Confirmed rewinds atomically discard weather and Predict Weather state on and after the target date, making the target day clean. This includes older next-day predictions targeting the abandoned timeline.
+- Earlier weather and predictions wholly before the target date are preserved, along with other servers' data and party level.
+- Forward and same-date setting remain non-destructive. Opening, cancelling, or timing out a rewind prompt changes nothing.
+- Intervening campaign changes invalidate pending rewind confirmations. No schema migration is required.
+
 ## 1.0.0
 
 Initial stable release of Kingmaker Bot.

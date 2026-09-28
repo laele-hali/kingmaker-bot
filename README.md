@@ -1,4 +1,4 @@
-# Kingmaker Bot v1.0.0
+# Kingmaker Bot v1.0.1
 
 Kingmaker Bot is a Discord campaign utility for Pathfinder 2e, designed to make calendar and weather management feel like part of the game rather than bookkeeping. It currently provides a persistent Golarion calendar, Kingmaker Stolen Lands weather generation, and player-facing Predict Weather forecasts.
 
@@ -18,7 +18,7 @@ New to Kingmaker Bot? The current release is self-hosted: you create your own Di
 ### Using the Bot
 
 - [User Guide](docs/USER_GUIDE.md) — Commands and table use for players and GMs.
-- [Changelog](CHANGELOG.md) — Release history and the v1.0.0 feature summary.
+- [Changelog](CHANGELOG.md) — Release history, including the v1.0.1 rewind bugfix.
 
 ### Integrations
 
@@ -34,6 +34,8 @@ New to Kingmaker Bot? The current release is self-hosted: you create your own Di
 - [GitHub repository](https://github.com/laele-hali/kingmaker-bot)
 
 ## v1.0.0 — Stable core calendar and weather release
+
+v1.0.1 fixes campaign-date rewinds: backwards `/calendar set` requires private confirmation and permanently discards weather and predictions on and after the target date. Earlier weather and predictions wholly before that date are preserved. Forward and same-date setting preserve all data. See the [rewind guide](docs/USER_GUIDE.md#correcting-the-campaign-date).
 
 v1.0.0 establishes the stable calendar and weather lifecycle, with automated tests covering the implemented core:
 
@@ -114,6 +116,7 @@ src/kingmaker_bot/
     discord_calendar_commands.py    Slash commands and prediction modal
     discord_weather_formatter.py    World-weather presentation
     discord_weather_view.py         Private confirmation for public weather reveal
+    discord_calendar_view.py        Private confirmation for campaign rewinds
     discord_prediction_formatter.py Character-facing forecast presentation
     discord_client.py               Client setup and command synchronization
     main.py                         Configuration and dependency wiring

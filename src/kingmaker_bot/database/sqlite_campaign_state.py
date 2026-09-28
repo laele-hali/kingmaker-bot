@@ -6,6 +6,7 @@ from pathlib import Path
 
 from kingmaker_bot.calendar import CalendarDate
 from kingmaker_bot.campaign import CampaignState
+from kingmaker_bot.campaign.repository import StaleCampaignStateError
 
 
 class SQLiteCampaignStateRepository:
@@ -66,6 +67,43 @@ class SQLiteCampaignStateRepository:
             created_at=datetime.fromisoformat(row["created_at"]),
             updated_at=datetime.fromisoformat(row["updated_at"]),
             party_level=row["party_level"],
+        )
+
+    def rewind(self, expected: CampaignState, target: CalendarDate) -> CampaignState:
+        """Delete abandoned weather/attempts and change date in one transaction."""
+        boundary = (target.year, target.month, target.day)
+        current = expected.current_date
+        if boundary >= (current.year, current.month, current.day):
+            raise ValueError("rewind target must precede the current date")
+        now = max(datetime.now(timezone.utc), expected.updated_at + timedelta(microseconds=1))
+        with sqlite3.connect(self.database_path) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT updated_at FROM campaign_state WHERE guild_id = ?",
+                (expected.guild_id,),
+            ).fetchone()
+            if row is None or row[0] != expected.updated_at.isoformat():
+                raise StaleCampaignStateError()
+            # Include legacy attempts made earlier but forecasting abandoned days.
+            connection.execute(
+                """DELETE FROM prediction_attempt WHERE guild_id = ? AND (
+                    (campaign_year, campaign_month, campaign_day) >= (?, ?, ?)
+                    OR (forecast_year, forecast_month, forecast_day) >= (?, ?, ?))""",
+                (expected.guild_id, *boundary, *boundary),
+            )
+            connection.execute(
+                """DELETE FROM daily_weather WHERE guild_id = ?
+                   AND (year, month, day) >= (?, ?, ?)""",
+                (expected.guild_id, *boundary),
+            )
+            connection.execute(
+                """UPDATE campaign_state SET current_year = ?, current_month = ?,
+                   current_day = ?, updated_at = ? WHERE guild_id = ?""",
+                (*boundary, now.isoformat(), expected.guild_id),
+            )
+        return CampaignState(
+            guild_id=expected.guild_id, current_date=target,
+            created_at=expected.created_at, updated_at=now, party_level=expected.party_level,
         )
 
     def save(self, state: CampaignState) -> CampaignState:
