@@ -1,5 +1,7 @@
 # Kingmaker Bot User Guide
 
+[Project overview](../README.md) · [Discord Setup: Self-Hosted](DISCORD_SETUP_SELF_HOSTED.md)
+
 Use these commands in your campaign's Discord server. Campaign dates and party level are configured separately for each server.
 
 ## PLAYER GUIDE

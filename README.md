@@ -2,11 +2,35 @@
 
 Kingmaker Bot is a Discord campaign utility for Pathfinder 2e, designed to make calendar and weather management feel like part of the game rather than bookkeeping. It currently provides a persistent Golarion calendar, Kingmaker Stolen Lands weather generation, and player-facing Predict Weather forecasts.
 
-## Using the bot
+## Documentation
 
-Running this in a Pathfinder campaign rather than developing it?
+### Getting Started
 
-See the [User Guide](USER_GUIDE.md) for player and GM commands, Predict Weather, and table use.
+New to Kingmaker Bot? The current release is self-hosted: you create your own Discord application and run your own instance. There is no official hosted service.
+
+1. [Discord Setup: Self-Hosted](docs/DISCORD_SETUP_SELF_HOSTED.md)
+2. [User Guide](docs/USER_GUIDE.md)
+
+### Setup
+
+- [Discord Setup: Self-Hosted](docs/DISCORD_SETUP_SELF_HOSTED.md) — Create your own Discord application, configure the bot, and run it on your infrastructure.
+
+### Using the Bot
+
+- [User Guide](docs/USER_GUIDE.md) — Commands and table use for players and GMs.
+
+### Integrations
+
+- Discord — supported through the self-hosted bot.
+- Roll20 — planned, not currently implemented.
+
+### Development
+
+- [Architecture and project structure](#architecture-and-project-structure)
+- [Local development with Docker Compose](#local-development-with-docker-compose)
+- [Environment variables](#environment-variables) and [persistence](#persistence)
+- [Running tests](#running-tests)
+- [GitHub repository](https://github.com/laele-hali/kingmaker-bot)
 
 ## Current development status
 
@@ -31,7 +55,7 @@ The current profile is `kingmaker_stolen_lands`. The profile-driven engine imple
 
 Weather is generated for an explicit date and stored canonically by guild, date, and profile. Repeated requests return the stored result rather than rerolling it, including after party-level changes. Date changes alone do not generate weather for elapsed days.
 
-Stored records distinguish generation from revelation through `generated_at` and nullable `revealed_at`. Predict Weather can generate future weather invisibly; `/calendar weather` reveals the same stored weather once that date becomes current. Revealing weather does not replace it.
+Stored records distinguish generation from revelation through `created_at` and nullable `revealed_at`. Predict Weather can generate future weather invisibly; `/calendar weather` reveals the same stored weather once that date becomes current. Revealing weather does not replace it.
 
 ### Predict Weather
 
