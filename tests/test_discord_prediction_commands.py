@@ -1,5 +1,6 @@
 import asyncio
 import re
+import sqlite3
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -313,6 +314,87 @@ def test_discord_prediction_keeps_canonical_weather_hidden_and_reuses_it(tmp_pat
     assert "already attempted" in duplicate.response.send_message.await_args.args[0]
     assert dice.count == 2
     assert prediction_repository.get(123, 456, current, PROFILE_ID) == stored_attempt
+
+
+@pytest.mark.parametrize(
+    ("conditions", "dc"),
+    [(PredictionConditions.COMMANDING_VIEW, 15),
+     (PredictionConditions.NORMAL, 20),
+     (PredictionConditions.POOR, 30)],
+)
+def test_modal_final_total_one_persists_concealed_critical_failure(tmp_path, conditions, dc):
+    database = tmp_path / "modal-total-one.sqlite3"
+    current = CalendarDate(19, 3, 4710)
+    campaigns = SQLiteCampaignStateRepository(database)
+    campaigns.save(CampaignState(123, current, party_level=4))
+
+    class RainWithoutEvent:
+        def __init__(self):
+            self.rolls = iter((15, 1))
+            self.count = 0
+
+        def roll(self, sides):
+            self.count += 1
+            return next(self.rolls)
+
+    class NoPrecipitationForecast:
+        def choice(self, candidates):
+            return next(candidate for candidate in candidates
+                        if candidate.precipitation is PrecipitationType.NONE)
+
+    dice = RainWithoutEvent()
+    weather_repository = SQLiteWeatherRepository(database)
+    weather_service = WeatherService(
+        weather_repository, {PROFILE_ID: WeatherEngine(KingmakerStolenLandsProfile(), dice)}
+    )
+    predictions = SQLitePredictionRepository(database)
+    prediction_service = PredictWeatherService(
+        predictions, weather_service, PROFILE_ID, NoPrecipitationForecast()
+    )
+    group = register_calendar_commands(
+        FakeTree(), CalendarService(campaigns), weather_service, prediction_service
+    )
+
+    interaction = submit(open_modal(group, conditions), "1")
+
+    attempt = predictions.get(123, 456, current, PROFILE_ID)
+    assert attempt.survival_total == 1
+    assert attempt.conditions is conditions
+    assert attempt.dc == dc
+    assert attempt.degree is DegreeOfSuccess.CRITICAL_FAILURE
+    assert attempt.forecast.is_false
+    # Stage 7b.1 deliberately gives the confident false forecast the detailed bonus.
+    assert attempt.forecast.preparation_bonus == 2
+    with sqlite3.connect(database) as connection:
+        assert connection.execute(
+            "SELECT survival_total, conditions, check_dc, degree FROM prediction_attempt"
+        ).fetchone() == (1, conditions.value, dc, "critical_failure")
+
+    interaction.response.send_message.assert_awaited_once_with(
+        "Forecast for Sunday, 20 Pharast 4710 AR\n"
+        "Precipitation: No precipitation.\n"
+        "No significant weather event is expected during the coming day.\n"
+        "You gain a +2 circumstance bonus to Survival checks to prepare for this weather.",
+        ephemeral=False,
+    )
+    output = interaction.response.send_message.await_args.args[0].lower()
+    for secret in ("critical failure", "critical_failure", "false", "rain", "dc", "total"):
+        assert secret not in output
+    assert "1" not in re.findall(r"\b\d+\b", output)
+
+    canonical = weather_repository.get(123, current.advance(), PROFILE_ID)
+    assert canonical.weather.precipitation.precipitation_type is PrecipitationType.RAIN
+    assert canonical.revealed_at is None
+    assert weather_service.get_or_generate(123, current.advance(), 4, PROFILE_ID) == canonical
+    assert dice.count == 2
+
+    duplicate = submit(open_modal(group, conditions), "1")
+    duplicate.response.send_message.assert_awaited_once_with(
+        "You have already attempted Predict Weather for this campaign date.", ephemeral=True
+    )
+    assert predictions.get(123, 456, current, PROFILE_ID) == attempt
+    assert weather_repository.get(123, current.advance(), PROFILE_ID) == canonical
+    assert dice.count == 2
 
 
 @pytest.mark.parametrize("conditions", list(PredictionConditions))
