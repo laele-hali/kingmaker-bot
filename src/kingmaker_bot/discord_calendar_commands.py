@@ -103,7 +103,7 @@ class PredictWeatherModal(discord.ui.Modal, title="Predict Weather"):
             )
             return
 
-        await interaction.response.send_message(format_prediction(attempt), ephemeral=True)
+        await interaction.response.send_message(format_prediction(attempt), ephemeral=False)
 
 
 def register_calendar_commands(
@@ -230,9 +230,9 @@ def register_calendar_commands(
     @group.command(name="predict", description="Predict weather for the coming day")
     @app_commands.choices(
         conditions=[
-            app_commands.Choice(name="Commanding view — DC 15", value=PredictionConditions.COMMANDING_VIEW.value),
-            app_commands.Choice(name="Normal conditions — DC 20", value=PredictionConditions.NORMAL.value),
-            app_commands.Choice(name="Poor conditions / visibility — DC 30", value=PredictionConditions.POOR.value),
+            app_commands.Choice(name="Good visibility / commanding view", value=PredictionConditions.COMMANDING_VIEW.value),
+            app_commands.Choice(name="Normal conditions", value=PredictionConditions.NORMAL.value),
+            app_commands.Choice(name="Poor visibility", value=PredictionConditions.POOR.value),
         ]
     )
     async def predict(

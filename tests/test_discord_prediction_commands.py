@@ -1,4 +1,5 @@
 import asyncio
+import re
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -28,6 +29,7 @@ from kingmaker_bot.prediction import (
 )
 from kingmaker_bot.weather import PrecipitationType
 from kingmaker_bot.weather import KingmakerStolenLandsProfile, PROFILE_ID, WeatherEngine
+from kingmaker_bot.weather import HazardLevel, WeatherEvent, WeatherEventDefinition
 
 
 class FakeTree:
@@ -101,7 +103,7 @@ def register(state, prediction_service):
 
 def open_modal(group, conditions=PredictionConditions.NORMAL):
     interaction = command_interaction()
-    choice = app_commands.Choice(name="Normal conditions — DC 20", value=conditions.value)
+    choice = app_commands.Choice(name="Normal conditions", value=conditions.value)
     asyncio.run(group.get_command("predict").callback(interaction, choice))
     interaction.response.send_modal.assert_awaited_once()
     return interaction.response.send_modal.await_args.args[0]
@@ -121,10 +123,11 @@ def test_predict_command_is_registered_with_user_facing_condition_choices():
     assert command is not None
     choices = command._params["conditions"].choices
     assert [(choice.name, choice.value) for choice in choices] == [
-        ("Commanding view — DC 15", PredictionConditions.COMMANDING_VIEW.value),
-        ("Normal conditions — DC 20", PredictionConditions.NORMAL.value),
-        ("Poor conditions / visibility — DC 30", PredictionConditions.POOR.value),
+        ("Good visibility / commanding view", PredictionConditions.COMMANDING_VIEW.value),
+        ("Normal conditions", PredictionConditions.NORMAL.value),
+        ("Poor visibility", PredictionConditions.POOR.value),
     ]
+    assert all(not any(character.isdigit() for character in choice.name) for choice in choices)
 
 
 @pytest.mark.parametrize(
@@ -141,7 +144,7 @@ def test_missing_prerequisites_reply_ephemerally_without_modal_or_service_call(s
     prediction = FakePredictionService()
     group = register(state, prediction)
     interaction = command_interaction()
-    choice = app_commands.Choice(name="Normal conditions — DC 20", value="normal")
+    choice = app_commands.Choice(name="Normal conditions", value="normal")
 
     asyncio.run(group.get_command("predict").callback(interaction, choice))
 
@@ -168,6 +171,10 @@ def test_modal_requires_a_final_integer_total_and_passes_selected_inputs():
     assert modal.survival_total.to_component_dict()["label"] == "Survival check total"
     assert modal.survival_total.required
     assert "die result" in modal.survival_total.placeholder
+    assert "dc" not in (
+        modal.title + modal.survival_total.to_component_dict()["label"]
+        + modal.survival_total.placeholder
+    ).lower()
 
     interaction = submit(modal, "31")
 
@@ -182,7 +189,7 @@ def test_modal_requires_a_final_integer_total_and_passes_selected_inputs():
         }
     ]
     interaction.response.send_message.assert_awaited_once()
-    assert interaction.response.send_message.await_args.kwargs["ephemeral"] is True
+    assert interaction.response.send_message.await_args.kwargs["ephemeral"] is False
 
 
 @pytest.mark.parametrize("value", ["", "twenty", "20.5"])
@@ -277,7 +284,7 @@ def test_discord_prediction_keeps_canonical_weather_hidden_and_reuses_it(tmp_pat
         FakeTree(), CalendarService(campaigns), weather_service, prediction_service
     )
     predict_command = group.get_command("predict")
-    choice = app_commands.Choice(name="Normal conditions — DC 20", value="normal")
+    choice = app_commands.Choice(name="Normal conditions", value="normal")
 
     async def make_prediction():
         invoke = command_interaction()
@@ -289,7 +296,7 @@ def test_discord_prediction_keeps_canonical_weather_hidden_and_reuses_it(tmp_pat
         return submit_interaction
 
     first = asyncio.run(make_prediction())
-    assert first.response.send_message.await_args.kwargs["ephemeral"] is True
+    assert first.response.send_message.await_args.kwargs["ephemeral"] is False
     assert dice.count == 2
     canonical = weather_repository.get(123, current.advance(), PROFILE_ID)
     assert canonical is not None
@@ -306,3 +313,75 @@ def test_discord_prediction_keeps_canonical_weather_hidden_and_reuses_it(tmp_pat
     assert "already attempted" in duplicate.response.send_message.await_args.args[0]
     assert dice.count == 2
     assert prediction_repository.get(123, 456, current, PROFILE_ID) == stored_attempt
+
+
+@pytest.mark.parametrize("conditions", list(PredictionConditions))
+@pytest.mark.parametrize(
+    ("degree", "offset"),
+    [(DegreeOfSuccess.CRITICAL_SUCCESS, 11), (DegreeOfSuccess.SUCCESS, 1),
+     (DegreeOfSuccess.FAILURE, -1), (DegreeOfSuccess.CRITICAL_FAILURE, -11)],
+)
+def test_all_resolved_forecasts_are_public_without_check_or_degree_details(conditions, degree, offset):
+    total = conditions.dc + offset
+    detailed = degree in (DegreeOfSuccess.CRITICAL_SUCCESS, DegreeOfSuccess.CRITICAL_FAILURE)
+    forecast = (
+        WeatherForecast(None, None, None, None, None)
+        if degree is DegreeOfSuccess.FAILURE else
+        WeatherForecast(
+            PrecipitationType.NONE, None, True,
+            WeatherEventDefinition(WeatherEvent.WINDSTORM, HazardLevel(exact=1)) if detailed else None,
+            2 if detailed else 1,
+            is_false=degree is DegreeOfSuccess.CRITICAL_FAILURE,
+        )
+    )
+    attempt = make_attempt(conditions=conditions, total=total, degree=degree, forecast=forecast)
+    prediction = FakePredictionService(attempt)
+    modal = open_modal(
+        register(CampaignState(123, CalendarDate(17, 3, 4710), party_level=4), prediction),
+        conditions,
+    )
+
+    interaction = submit(modal, str(total))
+
+    interaction.response.send_message.assert_awaited_once()
+    response = interaction.response.send_message.await_args
+    assert response.kwargs["ephemeral"] is False
+    output = response.args[0]
+    for secret in ("dc", "success", "failure", "false", "check total"):
+        assert secret not in output.lower()
+    assert str(total) not in re.findall(r"\b\d+\b", output)
+    assert str(conditions.dc) not in re.findall(r"\b\d+\b", output)
+    if degree is DegreeOfSuccess.FAILURE:
+        assert "unable to obtain a useful forecast" in output
+        assert "precipitation" not in output.lower()
+    else:
+        assert "No precipitation" in output
+        assert ("Windstorm is expected" in output) is detailed
+
+
+@pytest.mark.parametrize("error", [ValueError("DC 20 total 19"), RuntimeError("DC 30")])
+def test_application_errors_are_private_and_do_not_expose_internal_details(error):
+    prediction = FakePredictionService(error=error)
+    modal = open_modal(
+        register(CampaignState(123, CalendarDate(17, 3, 4710), party_level=4), prediction)
+    )
+    interaction = submit(modal, "19")
+    interaction.response.send_message.assert_awaited_once_with(
+        "The prediction could not be completed. Please try again later.", ephemeral=True
+    )
+
+
+@pytest.mark.parametrize("value", ["invalid", "normal"])
+def test_invalid_conditions_and_unavailable_service_are_private(value):
+    group = register(
+        CampaignState(123, CalendarDate(17, 3, 4710), party_level=4),
+        FakePredictionService() if value == "invalid" else None,
+    )
+    interaction = command_interaction()
+    asyncio.run(group.get_command("predict").callback(
+        interaction, app_commands.Choice(name=value, value=value)
+    ))
+    response = interaction.response.send_message.await_args
+    assert response.kwargs["ephemeral"] is True
+    assert "dc" not in response.args[0].lower()
+    interaction.response.send_modal.assert_not_awaited()
