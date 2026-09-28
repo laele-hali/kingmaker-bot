@@ -1,6 +1,12 @@
 # Kingmaker Discord Bot
 
-A Discord bot for Pathfinder 2e campaign calendar and weather management, initially supporting Kingmaker's Stolen Lands. For session use, see [USER_GUIDE.md](USER_GUIDE.md).
+Kingmaker Bot is a Discord campaign utility for Pathfinder 2e, designed to make calendar and weather management feel like part of the game rather than bookkeeping. It currently provides a persistent Golarion calendar, Kingmaker Stolen Lands weather generation, and player-facing Predict Weather forecasts.
+
+## Using the bot
+
+Running this in a Pathfinder campaign rather than developing it?
+
+See the [User Guide](USER_GUIDE.md) for player and GM commands, Predict Weather, and table use.
 
 ## Current development status
 

@@ -19,7 +19,7 @@ Choose the conditions agreed with your GM:
 
 Enter the **final Survival check total**, including your modifiers, as a whole number. Do not enter just the raw d20 roll. The bot does not roll Survival for you.
 
-Your modal submission is private. The resolved forecast is posted publicly in the channel, including a result saying you cannot obtain a useful forecast. Your submitted total is not published. Predict Weather's check mechanics, DC, and degree-of-success result are intentionally hidden. Treat the returned forecast as **what your character believes**.
+Your modal submission is private. The resolved forecast is posted publicly in the channel, including a result saying you cannot obtain a useful forecast. Your submitted total is not published. Predict Weather follows Secret-check behavior: its check mechanics, DC, and degree-of-success result are intentionally hidden. Treat the returned forecast as **what your character believes**.
 
 Only one Predict Weather attempt is allowed per user per campaign date. For your character, this means using your Discord account's daily attempt: the bot tracks users, not separate characters. This approximates the 24-hour restriction using campaign dates. Failed attempts also count; changing conditions does not allow another attempt. Missing configuration, invalid input, and duplicate-attempt errors are private. Ask the GM to configure the calendar and party level if needed.
 
@@ -50,7 +50,7 @@ Months 1–12 are Abadius, Calistril, Pharast, Gozran, Desnus, Sarenith, Erastus
 | Visibility | Public within the invoking channel | Resolved forecasts public; validation and duplicate errors private |
 | Effect on actual weather | Retrieves/generates and marks it revealed | Retrieves/generates without marking it revealed |
 
-Weather is **canonical**: once generated for a date, it is stored and reused. A prediction may already have generated tomorrow's weather invisibly. When tomorrow arrives, `/calendar weather` reveals that same result rather than rerolling it. Advancing the date does not itself reveal or generate weather.
+The bot treats generated weather as **canonical**. Once weather has been generated for a date, that result becomes the actual weather for that day and is not rerolled. A prediction may already have generated tomorrow's weather invisibly. When tomorrow arrives, `/calendar weather` reveals that same result rather than rerolling it. Advancing the date does not itself reveal or generate weather.
 
 ### Secret-check behavior
 
@@ -76,4 +76,4 @@ Attempts are stored once per Discord user per campaign date. This is a campaign-
 | 3 | The bot resolves the attempt. | Its character-facing forecast is posted in the channel; the total and outcome label remain hidden. |
 | 4 | The next campaign day arrives; GM runs `/calendar advance days:1`. | The date becomes 20 Pharast. |
 | 5 | GM runs `/calendar weather` in the appropriate channel. | The bot retrieves the previously generated weather. |
-| 6 | The weather response appears. | That canonical record is marked revealed and displayed without rerolling, whether or not it matches the character's forecast. |
+| 6 | The weather response appears. | The stored canonical weather is revealed without being rerolled. |
