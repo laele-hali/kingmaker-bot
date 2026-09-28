@@ -1,4 +1,4 @@
-# Kingmaker Discord Bot
+# Kingmaker Bot v1.0.0
 
 Kingmaker Bot is a Discord campaign utility for Pathfinder 2e, designed to make calendar and weather management feel like part of the game rather than bookkeeping. It currently provides a persistent Golarion calendar, Kingmaker Stolen Lands weather generation, and player-facing Predict Weather forecasts.
 
@@ -18,11 +18,12 @@ New to Kingmaker Bot? The current release is self-hosted: you create your own Di
 ### Using the Bot
 
 - [User Guide](docs/USER_GUIDE.md) — Commands and table use for players and GMs.
+- [Changelog](CHANGELOG.md) — Release history and the v1.0.0 feature summary.
 
 ### Integrations
 
 - Discord — supported through the self-hosted bot.
-- Roll20 — planned, not currently implemented.
+- Roll20 — potential v2.0 integration, not currently implemented.
 
 ### Development
 
@@ -32,9 +33,17 @@ New to Kingmaker Bot? The current release is self-hosted: you create your own Di
 - [Running tests](#running-tests)
 - [GitHub repository](https://github.com/laele-hali/kingmaker-bot)
 
-## Current development status
+## v1.0.0 — Stable core calendar and weather release
 
-The calendar, guild-scoped campaign persistence, Discord calendar commands, RAW Kingmaker weather engine, canonical weather persistence, and Predict Weather workflow are implemented and covered by automated tests. Development remains incremental; the future features below are not available commands.
+v1.0.0 establishes the stable calendar and weather lifecycle, with automated tests covering the implemented core:
+
+- Persistent Golarion/Absalom Reckoning calendar, independent campaign state for each Discord server, and party-level configuration.
+- RAW Kingmaker Stolen Lands weather generation with canonical generate-once results and SQLite storage for campaigns, weather, and prediction attempts.
+- Character-facing Predict Weather for the current campaign date, with concealed check mechanics and concealed critical-failure forecasts that never change actual weather.
+- Hidden generated weather distinct from publicly revealed weather; an explicit first-reveal confirmation, safe cancellation/timeout, and no rerolls on repeat display. Public Discord output hides generation rolls/DCs.
+- Docker-based self-hosting and setup, player, and GM documentation.
+
+The roadmap below is planned work, not part of the v1.0 feature set. See the [changelog](CHANGELOG.md) for the release record.
 
 The project uses Python 3.12, discord.py, SQLite through the standard-library `sqlite3` module, pytest, and Docker Compose.
 
@@ -176,10 +185,29 @@ Tests cover domain boundaries, persistence, services, formatting, and command/mo
 - Ambiguous hazard levels and successful linked secondary-event checks require GM resolution. Event rerolls have a safety limit that also flags GM resolution when exhausted.
 - Terrain/location is not configured or automatically resolved; consult the published hazard rules for applicability and effects.
 - Stored weather and prediction attempts have no Discord history browser, edit, reset, or reroll command.
+- The reveal timestamp is saved before the public Discord send. These operations are not atomic: if delivery fails, repeat `/calendar weather` to display the stored result without rerolling.
 
-## Planned / future features — not implemented
+## v1.5 — Planned history, reporting, and quality of life
 
-Future work may include weather-history and GM/admin interfaces, explicit reroll tools, optional natural-weather continuity, additional regional or climate profiles, and VTT/web integrations. These remain separate from the implemented RAW profile. Custom or derived models must be distinguished from published rules.
+**PLANNED — not implemented.** Build on the stable v1 weather lifecycle to analyse and present stored weather:
+
+- Revealed weather history and historical browsing.
+- Date and date-range queries where appropriate.
+- Weather summaries and seasonal/campaign statistics.
+- Improved historical presentation and related quality-of-life improvements.
+
+History and reporting must not expose hidden/unrevealed canonical weather. This scope does not change future weather generation or feed statistics back into the weather engine.
+
+## v2.0 — Potential future direction
+
+These are possible future areas, not committed features or current functionality:
+
+- Additional weather/climate profiles and regional weather support.
+- Natural weather continuity and patterns.
+- Roll20/VTT integration and broader campaign automation.
+- Easier hosted installation and distribution.
+
+There is no public hosted bot, Roll20 integration, regional profile selection, or natural-weather mode in v1.0. Custom or derived models must remain distinguishable from published rules.
 
 ## Rules and copyright
 

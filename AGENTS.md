@@ -5,13 +5,24 @@
 This repository contains a Discord bot for Pathfinder 2e campaign
 management.
 
-The initial target campaign is Kingmaker, with development focused on:
+The current target campaign is Kingmaker, with the stable core covering:
 
 - Golarion calendar tracking
 - Persistent campaign state
 - Stolen Lands weather generation
-- Weather history
 - Predict Weather support
+
+The v1.0 core behavior is stable. Preserve its established semantics unless
+the current task explicitly requests a behavioral change:
+
+- Canonical weather is generated once and reused.
+- Generated weather is not automatically revealed.
+- Predict Weather targets the current campaign date without revealing actual weather.
+- The first actual-weather reveal is deliberate and requires confirmation.
+- Public Discord output shows results/gameplay information, not generation machinery.
+- Future history/reporting must never expose hidden or unrevealed weather.
+
+Weather history and reporting are future work, not implemented core features.
 
 The architecture should remain sufficiently generic that the calendar,
 weather engine, and campaign services can later support other Pathfinder
@@ -287,17 +298,16 @@ campaign date.
 A campaign should be explicitly configured before campaign-dependent
 commands operate on it.
 
-Initial campaign state will include at minimum:
+Campaign state includes:
 
 - Discord guild ID
 - Current Golarion date
+- Optional party level
 
-Party level will be required by weather generation and may become part
-of campaign state when needed.
+Party level must be configured before weather generation and prediction.
 
 Future campaign configuration may include:
 
-- Party level
 - Region
 - Weather profile
 - Terrain or current location
@@ -352,7 +362,7 @@ Weather generation must be profile-driven.
 Do not make the global weather engine synonymous with Kingmaker or the
 Stolen Lands.
 
-The first supported weather profile will implement the published
+The current supported weather profile implements the published
 Kingmaker Stolen Lands weather procedure.
 
 Conceptually:
@@ -404,7 +414,7 @@ weather profile as an official Pathfinder rule.
 
 ## Kingmaker Weather
 
-The initial weather implementation will follow the Stolen Lands weather
+The current weather implementation follows the Stolen Lands weather
 procedure supplied for the project.
 
 It includes:
@@ -527,6 +537,9 @@ Historical data may later be used for:
 Do not introduce analytics or climate modelling until explicitly
 requested.
 
+Future player-facing history, summaries, and statistics must use revealed
+weather only. Reporting must not disclose hidden weather or change generation.
+
 ---
 
 ## Natural Weather Mode
@@ -605,20 +618,22 @@ Keep one attempt per Discord user, guild, campaign date, and profile.
 
 ## Prediction Usage
 
-The system should eventually support the Predict Weather feat's usage
-restrictions, including tracking attempts where necessary.
+The system persists one attempt per Discord user, guild, campaign date, and
+profile. This approximates the usage restriction by campaign date rather than
+elapsed hours; failure and critical failure both consume an attempt.
 
-Prediction history may eventually include:
+Stored attempts include:
 
 - Campaign/guild
 - Player or Discord user
 - Date prediction was made
 - Date or period being forecast
 - Submitted Survival total
+- Conditions, check DC, profile, and forecast
 - Degree of success
 - Creation timestamp
 
-Do not implement prediction history until required.
+Do not add a prediction-history interface until explicitly requested.
 
 Do not store character sheets or Survival modifiers merely to support
 this feature unless a future requirement explicitly requires them.
@@ -637,18 +652,17 @@ Discord handlers should:
 
 They should not implement core game rules.
 
-Planned calendar interactions include:
+Implemented calendar interactions include:
 
     /calendar date
     /calendar set
     /calendar advance
+    /calendar level
     /calendar weather
     /calendar predict
 
-Exact command syntax and Discord UI may evolve during implementation.
-
-Do not implement planned commands until they are part of the current
-task.
+Preserve established command behavior unless the current task requests changes.
+Do not implement additional commands merely because they appear on a roadmap.
 
 ---
 
@@ -690,8 +704,8 @@ A region may select a default weather profile, but the underlying
 weather engine should not require a hard-coded relationship between the
 two.
 
-The Stolen Lands will be the initial supported region because it is
-required by the Kingmaker campaign.
+The current weather profile covers the Stolen Lands for the Kingmaker campaign;
+configurable regional support is not implemented.
 
 Future regional or climate profiles may be based on:
 
@@ -711,7 +725,8 @@ initial Kingmaker development.
 
 Develop incrementally.
 
-The intended development order is:
+Stages 1–7 below are implemented in the stable v1.0 core. Later stages remain
+future work, subject to explicit task scope:
 
 1. Project and Docker foundation
 2. Golarion calendar domain
