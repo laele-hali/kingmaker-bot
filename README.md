@@ -55,15 +55,15 @@ The current profile is `kingmaker_stolen_lands`. The profile-driven engine imple
 
 Weather is generated for an explicit date and stored canonically by guild, date, and profile. Repeated requests return the stored result rather than rerolling it, including after party-level changes. Date changes alone do not generate weather for elapsed days.
 
-Stored records distinguish generation from revelation through `created_at` and nullable `revealed_at`. Predict Weather can generate future weather invisibly; `/calendar weather` reveals the same stored weather once that date becomes current. Revealing weather does not replace it.
+Generated does not mean revealed. Stored records distinguish these states through `created_at` and nullable `revealed_at`. Predict Weather can generate the current campaign day's weather invisibly. `/calendar weather` requires private confirmation before the first public reveal of actual conditions and mechanical details. Opening the confirmation, cancelling it, or letting it expire does not generate or reveal weather. Confirming reuses hidden weather or generates it if absent; further predictions for that date are then blocked. Already-revealed weather is displayed again without confirmation, rerolling, or changing the first reveal timestamp.
 
 ### Predict Weather
 
-Players select observation conditions and submit their **final Survival check total** through a modal. The bot forecasts the **next campaign day**, approximating a 24-hour forecast with calendar-day granularity.
+Predict Weather is the primary character-facing weather interaction. Players select observation conditions and submit their **final Survival check total** through a modal. Predict Weather represents the feat's next-24-hours forecast using the bot's day-level calendar abstraction. Because the bot does not track time of day, the forecast applies to the **current campaign date**, before that day's weather has been revealed.
 
 - Predict Weather DCs and degree-of-success labels are intentionally hidden from players. The submitted total is not posted publicly.
 - Every resolved result is posted publicly in the invoking channel, including an inability to obtain a useful forecast.
-- Prerequisite, validation, application, and duplicate-attempt errors remain private/ephemeral.
+- Prerequisite, validation, application, duplicate-attempt, and already-revealed-weather errors remain private/ephemeral. A revealed-weather rejection does not consume an attempt.
 - Attempts are persisted and limited to once per Discord user per campaign date in the guild and current profile. The 24-hour usage restriction is approximated as once per campaign date, not elapsed real time. There is no separate character identity.
 - Successful forecasts use canonical weather, with detail depending on the internal outcome. Critical-failure false forecasts never modify or reveal the canonical weather record.
 - The existing false-forecast model deliberately presents a confident detailed forecast with a +2 preparation bonus; that displayed bonus does not establish critical success.
@@ -80,12 +80,12 @@ All `/calendar` commands operate in a server. Arguments shown below are Discord 
 | `/calendar set day:<integer> month:<integer> year:<integer>` | Create or update the campaign date; month is 1–12. |
 | `/calendar advance days:<integer>` | Advance a configured calendar by a positive number of days. |
 | `/calendar level [level:<integer>]` | Show party level, or set it to 1–20 on a configured campaign. |
-| `/calendar weather` | Generate if absent, then reveal current-day canonical weather, including generation rolls/DCs and GM-resolution notes. |
-| `/calendar predict conditions:<choice>` | Open the Survival-total modal and resolve a next-day forecast. |
+| `/calendar weather` | Privately confirm the first public reveal of actual current-day weather, rolls/DCs, hazards, and GM-resolution notes; display already-revealed weather directly. |
+| `/calendar predict conditions:<choice>` | Open the Survival-total modal and forecast the current campaign date's unrevealed weather. |
 
 Prediction choices are **Good visibility / commanding view**, **Normal conditions**, and **Poor visibility**.
 
-The bot currently has no GM-role or administrator authorization checks for calendar commands. The GM/player distinction in the user guide describes intended table use, not enforced permissions. `/calendar weather` replies publicly in the invoking channel; use an appropriately restricted channel for GM information.
+The bot currently has no GM-role or administrator authorization checks for calendar commands. The GM/player distinction in the user guide describes intended table use, not enforced permissions. Only the invoking user can confirm or cancel their weather prompt; it expires after five minutes. Confirmed weather is public in the invoking channel, so choose that channel deliberately. A prompt is invalid if the campaign date changes before confirmation.
 
 ## Architecture and project structure
 
@@ -102,6 +102,7 @@ src/kingmaker_bot/
     services/                       Package placeholder; orchestration is in application/
     discord_calendar_commands.py    Slash commands and prediction modal
     discord_weather_formatter.py    World-weather presentation
+    discord_weather_view.py         Private confirmation for public weather reveal
     discord_prediction_formatter.py Character-facing forecast presentation
     discord_client.py               Client setup and command synchronization
     main.py                         Configuration and dependency wiring
@@ -150,7 +151,7 @@ No token or other secret belongs in source control or documentation.
 
 The default database is `/workspace/data/kingmaker.db` inside the container, corresponding to `data/kingmaker.db` in the repository directory on the host. The bind mount preserves it when the temporary container exits. For a custom path, ensure its parent directory exists and is writable; use a mounted location to retain data after container removal.
 
-SQLite stores campaign state, canonical weather, and prediction attempts. Schema initialization is safe to repeat. Prediction records include internal check information and potentially hidden weather-derived data. Keep databases private and out of Git; `*.db` and `.env` are ignored. Exclude any custom database filename not covered by that pattern too. Tests use temporary databases.
+SQLite stores campaign state, canonical weather, and prediction attempts. Schema initialization is safe to repeat. New attempts have equal campaign and forecast dates; historical next-day attempts remain readable and unchanged. Prediction records include internal check information and potentially hidden weather-derived data. Keep databases private and out of Git; `*.db` and `.env` are ignored. Exclude any custom database filename not covered by that pattern too. Tests use temporary databases.
 
 ### Running tests
 

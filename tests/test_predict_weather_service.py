@@ -9,7 +9,10 @@ from kingmaker_bot.database import SQLitePredictionRepository, SQLiteWeatherRepo
 from kingmaker_bot.prediction import (
     DegreeOfSuccess,
     PredictionAlreadyAttemptedError,
+    PredictionWeatherRevealedError,
+    PredictionAttempt,
     PredictionConditions,
+    WeatherForecast,
 )
 from kingmaker_bot.weather import (
     KingmakerStolenLandsProfile,
@@ -89,21 +92,24 @@ def test_total_to_dc_degree_boundaries(total, dc, degree):
 
 
 @pytest.mark.parametrize(
-    ("current", "forecast"),
+    "current",
     [
-        (CalendarDate(17, 3, 4710), CalendarDate(18, 3, 4710)),
-        (CalendarDate(31, 3, 4710), CalendarDate(1, 4, 4710)),
-        (CalendarDate(31, 12, 4710), CalendarDate(1, 1, 4711)),
-        (CalendarDate(28, 2, 4712), CalendarDate(29, 2, 4712)),
-        (CalendarDate(28, 2, 4710), CalendarDate(1, 3, 4710)),
+        CalendarDate(20, 3, 4710),
+        CalendarDate(31, 3, 4710),
+        CalendarDate(31, 12, 4710),
+        CalendarDate(28, 2, 4712),
+        CalendarDate(28, 2, 4710),
     ],
 )
-def test_prediction_targets_next_campaign_date(tmp_path, current, forecast):
+def test_prediction_targets_current_campaign_date(tmp_path, current):
     service, _, _, _ = service_bundle(tmp_path, rolls=(1, 1, 1, 1, 1, 1, 1, 1))
 
     attempt = service.predict(123, 456, current, 1, 20, PredictionConditions.NORMAL)
 
-    assert attempt.forecast_date == forecast
+    assert attempt.forecast_date == attempt.campaign_date == current
+    weather = SQLiteWeatherRepository(tmp_path / "predict.sqlite3")
+    assert weather.get(123, current, PROFILE_ID).revealed_at is None
+    assert weather.get(123, current.advance(), PROFILE_ID) is None
 
 
 def test_critical_success_reports_accurate_data_bonus_and_ambiguous_event(tmp_path):
@@ -126,10 +132,10 @@ def test_critical_success_reports_accurate_data_bonus_and_ambiguous_event(tmp_pa
 
 
 def test_critical_success_reports_winter_temperature_and_snow(tmp_path):
-    service, _, _, _ = service_bundle(tmp_path, rolls=(8, 16, 1))
+    service, _, _, _ = service_bundle(tmp_path, rolls=(8, 18, 1))
     attempt = service.predict(123, 456, CalendarDate(31, 12, 4710), 1, 30, PredictionConditions.NORMAL)
 
-    assert attempt.forecast_date == CalendarDate(1, 1, 4711)
+    assert attempt.forecast_date == CalendarDate(31, 12, 4710)
     assert attempt.forecast.precipitation is PrecipitationType.SNOW
     assert attempt.forecast.mild_cold is True
 
@@ -194,7 +200,7 @@ def test_injected_false_forecast_randomness_reproduces_the_same_result(tmp_path)
 def test_existing_canonical_weather_is_reused_without_rolls_or_reveal(tmp_path):
     service, _, weather_service, dice = service_bundle(tmp_path, rolls=(1, 1))
     current = CalendarDate(17, 3, 4710)
-    forecast_date = current.advance()
+    forecast_date = current
     canonical = weather_service.get_or_generate(123, forecast_date, 1, PROFILE_ID)
     consumed = dice.consumed
 
@@ -209,10 +215,11 @@ def test_existing_canonical_weather_is_reused_without_rolls_or_reveal(tmp_path):
     ).revealed_at is None
 
 
-def test_same_day_duplicate_is_rejected_before_weather_generation(tmp_path):
+@pytest.mark.parametrize("total", [30, 20, 19, 1])
+def test_same_day_duplicate_is_rejected_before_weather_generation(tmp_path, total):
     service, _, _, dice = service_bundle(tmp_path, rolls=(1, 1))
     current = CalendarDate(17, 3, 4710)
-    service.predict(123, 456, current, 1, 20, PredictionConditions.NORMAL)
+    service.predict(123, 456, current, 1, total, PredictionConditions.NORMAL)
     consumed = dice.consumed
 
     with pytest.raises(PredictionAlreadyAttemptedError):
@@ -251,3 +258,45 @@ def test_invalid_inputs_are_rejected(tmp_path, guild, user, date, party_level, t
     service, _, _, _ = service_bundle(tmp_path)
     with pytest.raises((TypeError, ValueError)):
         service.predict(guild, user, date, party_level, total, conditions)
+
+
+@pytest.mark.parametrize("total", [30, 20, 19, 1])
+def test_revealed_weather_blocks_before_resolution_without_mutation(tmp_path, monkeypatch, total):
+    service, predictions, weather, dice = service_bundle(tmp_path)
+    current = CalendarDate(20, 3, 4710)
+    weather.get_or_generate(123, current, 4, PROFILE_ID)
+    revealed = weather.reveal(123, current, PROFILE_ID)
+
+    def unexpected_resolution(*args):
+        pytest.fail("revealed weather must block before forecast resolution")
+
+    monkeypatch.setattr(service, "_forecast", unexpected_resolution)
+    with pytest.raises(PredictionWeatherRevealedError):
+        service.predict(123, 456, current, 4, total, PredictionConditions.NORMAL)
+
+    assert predictions.get(123, 456, current, PROFILE_ID) is None
+    assert weather.get_or_generate(123, current, 4, PROFILE_ID) == revealed
+    assert dice.consumed == 2
+
+
+def test_legacy_next_day_attempt_still_blocks_duplicate_without_generating_weather(tmp_path):
+    service, predictions, _, dice = service_bundle(tmp_path)
+    current = CalendarDate(20, 3, 4710)
+    legacy = PredictionAttempt(
+        guild_id=123,
+        user_id=456,
+        campaign_date=current,
+        forecast_date=current.advance(),
+        profile_id=PROFILE_ID,
+        survival_total=20,
+        conditions=PredictionConditions.NORMAL,
+        degree=DegreeOfSuccess.SUCCESS,
+        forecast=WeatherForecast(PrecipitationType.RAIN, None, False, None, 1),
+    )
+    predictions.save(legacy)
+
+    with pytest.raises(PredictionAlreadyAttemptedError):
+        service.predict(123, 456, current, 4, 20, PredictionConditions.NORMAL)
+
+    assert dice.consumed == 0
+    assert predictions.get(123, 456, current, PROFILE_ID) == legacy

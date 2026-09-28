@@ -156,3 +156,17 @@ def test_reveal_returns_metadata_without_rerolling_weather(database_path) -> Non
     assert revealed.revealed_at.tzinfo is timezone.utc
     assert repeated == revealed
     assert dice.calls == calls_after_generation
+
+
+def test_read_only_lookup_does_not_generate_or_reveal(database_path):
+    dice = SequenceDice(1, 1)
+    service, repository = build_service(database_path, dice)
+    date = CalendarDate(20, 3, 4710)
+    assert service.get(123, date, PROFILE_ID) is None
+    assert dice.calls == []
+    hidden = service.get_or_generate(123, date, 4, PROFILE_ID)
+    assert service.get(123, date, PROFILE_ID) == hidden
+    assert repository.get(123, date, PROFILE_ID).revealed_at is None
+    revealed = service.reveal(123, date, PROFILE_ID)
+    assert service.get(123, date, PROFILE_ID) == revealed
+    assert dice.calls == [1, 1]

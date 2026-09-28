@@ -35,7 +35,7 @@ def make_attempt(
         guild_id=guild_id,
         user_id=user_id,
         campaign_date=campaign_date,
-        forecast_date=campaign_date.advance(),
+        forecast_date=campaign_date,
         profile_id=profile_id,
         survival_total=total,
         conditions=conditions,
@@ -127,3 +127,25 @@ def test_naive_persisted_timestamp_is_rejected(repository, database_path):
 
     with pytest.raises(ValueError, match="timezone-aware"):
         repository.get(attempt.guild_id, attempt.user_id, attempt.campaign_date, attempt.profile_id)
+
+
+def test_legacy_next_day_row_is_read_without_rewriting(repository, database_path):
+    original = make_attempt(campaign_date=CalendarDate(31, 12, 4710))
+    legacy = replace(original, forecast_date=original.campaign_date.advance())
+    repository.save(legacy)
+    with sqlite3.connect(database_path) as connection:
+        before = connection.execute("SELECT * FROM prediction_attempt").fetchall()
+
+    reloaded = SQLitePredictionRepository(database_path).get(
+        legacy.guild_id, legacy.user_id, legacy.campaign_date, legacy.profile_id
+    )
+
+    assert reloaded == legacy
+    with sqlite3.connect(database_path) as connection:
+        assert connection.execute("SELECT * FROM prediction_attempt").fetchall() == before
+
+
+def test_forecast_date_outside_current_or_legacy_next_day_is_rejected():
+    attempt = make_attempt()
+    with pytest.raises(ValueError, match="forecast_date"):
+        replace(attempt, forecast_date=attempt.campaign_date.advance(2))

@@ -11,8 +11,10 @@ from kingmaker_bot.application.weather_service import WeatherService
 from kingmaker_bot.application.predict_weather_service import PredictWeatherService
 from kingmaker_bot.discord_weather_formatter import format_weather
 from kingmaker_bot.discord_prediction_formatter import format_prediction
+from kingmaker_bot.discord_weather_view import RevealWeatherView
 from kingmaker_bot.prediction import (
     PredictionAlreadyAttemptedError,
+    PredictionWeatherRevealedError,
     PredictionConditions,
 )
 from kingmaker_bot.weather import PROFILE_ID
@@ -93,6 +95,15 @@ class PredictWeatherModal(discord.ui.Modal, title="Predict Weather"):
         except PredictionAlreadyAttemptedError:
             await interaction.response.send_message(
                 "You have already attempted Predict Weather for this campaign date.",
+                ephemeral=True,
+            )
+            return
+        except PredictionWeatherRevealedError:
+            date = state.current_date
+            await interaction.response.send_message(
+                f"Predict Weather is no longer available for {date.weekday}, "
+                f"{date.day} {date.month_name} {date.year} AR.\n"
+                "The actual weather for this campaign day has already been revealed.",
                 ephemeral=True,
             )
             return
@@ -195,7 +206,7 @@ def register_calendar_commands(
                 response = f"Party level set to {state.party_level}."
         await interaction.response.send_message(response)
 
-    @group.command(name="weather", description="Reveal today's campaign weather")
+    @group.command(name="weather", description="Reveal actual weather for the current campaign date")
     async def weather(interaction: discord.Interaction) -> None:
         guild_id = await _guild_id_or_respond(interaction)
         if guild_id is None:
@@ -213,21 +224,22 @@ def register_calendar_commands(
             await interaction.response.send_message("Weather is temporarily unavailable.", ephemeral=True)
             return
         try:
-            weather_service.get_or_generate(
-                guild_id, state.current_date, state.party_level, PROFILE_ID
-            )
-            revealed = weather_service.reveal(guild_id, state.current_date, PROFILE_ID)
-            if revealed is None:
-                raise RuntimeError("canonical weather disappeared before reveal")
+            stored = weather_service.get(guild_id, state.current_date, PROFILE_ID)
         except Exception:
             # Discord receives no database or engine details; application layers retain their errors.
             await interaction.response.send_message(
                 "Weather could not be generated or loaded. Please try again later.", ephemeral=True
             )
             return
-        await interaction.response.send_message(format_weather(revealed.weather))
+        if stored is not None and stored.revealed_at is not None:
+            await interaction.response.send_message(format_weather(stored.weather))
+            return
+        view = RevealWeatherView(
+            service, weather_service, guild_id, interaction.user.id, state.current_date
+        )
+        await interaction.response.send_message(view.confirmation, view=view, ephemeral=True)
 
-    @group.command(name="predict", description="Predict weather for the coming day")
+    @group.command(name="predict", description="Predict weather for the current campaign date")
     @app_commands.choices(
         conditions=[
             app_commands.Choice(name="Good visibility / commanding view", value=PredictionConditions.COMMANDING_VIEW.value),

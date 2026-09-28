@@ -120,8 +120,10 @@ class PredictionAttempt:
                 raise ValueError(f"{name} must be a positive integer")
         if not isinstance(self.campaign_date, CalendarDate) or not isinstance(self.forecast_date, CalendarDate):
             raise TypeError("campaign_date and forecast_date must be CalendarDate values")
-        if self.forecast_date != self.campaign_date.advance(1):
-            raise ValueError("forecast_date must be the next campaign calendar day")
+        # Retain readability of historical next-day attempts. New service attempts
+        # always target the current campaign date.
+        if self.forecast_date not in (self.campaign_date, self.campaign_date.advance(1)):
+            raise ValueError("forecast_date must be the campaign date or the legacy next day")
         if not isinstance(self.profile_id, str) or not self.profile_id.strip():
             raise ValueError("profile_id must be a non-empty string")
         if not isinstance(self.survival_total, int) or isinstance(self.survival_total, bool):
@@ -164,3 +166,7 @@ class PredictionAttempt:
 
 class PredictionAlreadyAttemptedError(ValueError):
     """The user has already attempted the feat on this campaign date."""
+
+
+class PredictionWeatherRevealedError(ValueError):
+    """The campaign day's canonical weather is already revealed."""

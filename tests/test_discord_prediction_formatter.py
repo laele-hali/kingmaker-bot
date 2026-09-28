@@ -21,7 +21,7 @@ def make_attempt(degree, forecast, total, campaign_date=CalendarDate(17, 3, 4710
         guild_id=1,
         user_id=2,
         campaign_date=campaign_date,
-        forecast_date=campaign_date.advance(),
+        forecast_date=campaign_date,
         profile_id="kingmaker_stolen_lands",
         survival_total=total,
         conditions=PredictionConditions.NORMAL,
@@ -41,9 +41,9 @@ def test_critical_success_formats_detail_and_event_during_target_day():
 
     output = format_prediction(make_attempt(DegreeOfSuccess.CRITICAL_SUCCESS, forecast, 30))
 
-    assert "Forecast for" in output and "18 Pharast 4710 AR" in output
+    assert "Weather forecast for" in output and "17 Pharast 4710 AR" in output
     assert "Light rain" in output
-    assert "Windstorm is expected during the coming day" in output
+    assert "Windstorm is expected during the day ahead" in output
     assert "+2 circumstance bonus" in output
     assert "hour" not in output.lower()
     assert "ordinary wind" not in output.lower()
@@ -69,7 +69,7 @@ def test_success_formats_precipitation_temperature_and_event_without_identity():
 
     assert "Light snow" in output
     assert "Mild Cold" in output
-    assert "A significant weather event is expected during the coming day" in output
+    assert "A significant weather event is expected during the day ahead" in output
     assert "Windstorm" not in output
     assert "+1 circumstance bonus" in output
     assert "success" not in output.lower()
@@ -101,10 +101,13 @@ def test_critical_failure_formats_detailed_false_forecast_without_revealing_it()
         event_gm_resolution_required=True,
     )
 
-    output = format_prediction(make_attempt(DegreeOfSuccess.CRITICAL_FAILURE, forecast, 10))
+    output = format_prediction(make_attempt(
+        DegreeOfSuccess.CRITICAL_FAILURE, forecast, 10,
+        campaign_date=CalendarDate(18, 3, 4710),
+    ))
 
     assert "No precipitation" in output
-    assert "Tornado is expected during the coming day" in output
+    assert "Tornado is expected during the day ahead" in output
     assert "hazard level requires GM resolution" in output
     assert "+2 circumstance bonus" in output
     assert "critical failure" not in output.lower()

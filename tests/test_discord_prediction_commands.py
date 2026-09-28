@@ -76,7 +76,7 @@ def make_attempt(
         guild_id=123,
         user_id=456,
         campaign_date=current_date,
-        forecast_date=current_date.advance(),
+        forecast_date=current_date,
         profile_id="kingmaker_stolen_lands",
         survival_total=total,
         conditions=conditions,
@@ -258,9 +258,10 @@ def test_calendar_client_passes_weather_and_prediction_services_to_registration(
     assert isinstance(received["calendar"], CalendarService)
 
 
-def test_discord_prediction_keeps_canonical_weather_hidden_and_reuses_it(tmp_path):
+@pytest.mark.parametrize("existing_hidden", [False, True])
+def test_discord_prediction_then_weather_reveal_blocks_further_predictions(tmp_path, existing_hidden):
     database = tmp_path / "discord-predict.sqlite3"
-    current = CalendarDate(17, 3, 4710)
+    current = CalendarDate(20, 3, 4710)
     campaigns = SQLiteCampaignStateRepository(database)
     campaigns.save(CampaignState(123, current, party_level=4))
 
@@ -281,31 +282,47 @@ def test_discord_prediction_keeps_canonical_weather_hidden_and_reuses_it(tmp_pat
     )
     prediction_repository = SQLitePredictionRepository(database)
     prediction_service = PredictWeatherService(prediction_repository, weather_service, PROFILE_ID)
+    before = (
+        weather_service.get_or_generate(123, current, 4, PROFILE_ID)
+        if existing_hidden else None
+    )
     group = register_calendar_commands(
         FakeTree(), CalendarService(campaigns), weather_service, prediction_service
     )
     predict_command = group.get_command("predict")
     choice = app_commands.Choice(name="Normal conditions", value="normal")
 
-    async def make_prediction():
+    async def make_prediction(user_id=456):
         invoke = command_interaction()
         await predict_command.callback(invoke, choice)
         modal = invoke.response.send_modal.await_args.args[0]
         modal.survival_total._value = "20"
-        submit_interaction = command_interaction()
+        submit_interaction = command_interaction(user_id=user_id)
         await modal.on_submit(submit_interaction)
         return submit_interaction
+
+    # A pending reveal must not prevent a prediction or generate weather itself.
+    confirmation_interaction = command_interaction()
+    asyncio.run(group.get_command("weather").callback(confirmation_interaction))
+    reveal_view = confirmation_interaction.response.send_message.await_args.kwargs["view"]
+    assert confirmation_interaction.response.send_message.await_args.kwargs["ephemeral"] is True
+    assert weather_repository.get(123, current, PROFILE_ID) == before
 
     first = asyncio.run(make_prediction())
     assert first.response.send_message.await_args.kwargs["ephemeral"] is False
     assert dice.count == 2
-    canonical = weather_repository.get(123, current.advance(), PROFILE_ID)
+    canonical = weather_repository.get(123, current, PROFILE_ID)
     assert canonical is not None
     assert canonical.revealed_at is None
+    if before is not None:
+        assert canonical == before
     stored_attempt = prediction_repository.get(123, 456, current, PROFILE_ID)
     assert stored_attempt is not None
+    assert stored_attempt.forecast_date == stored_attempt.campaign_date == current
+    assert "Weather forecast for Sunday, 20 Pharast 4710 AR" in first.response.send_message.await_args.args[0]
+    assert weather_repository.get(123, current.advance(), PROFILE_ID) is None
 
-    later_weather = weather_service.get_or_generate(123, current.advance(), 4, PROFILE_ID)
+    later_weather = weather_service.get_or_generate(123, current, 4, PROFILE_ID)
     assert later_weather == canonical
     assert dice.count == 2
 
@@ -314,6 +331,45 @@ def test_discord_prediction_keeps_canonical_weather_hidden_and_reuses_it(tmp_pat
     assert "already attempted" in duplicate.response.send_message.await_args.args[0]
     assert dice.count == 2
     assert prediction_repository.get(123, 456, current, PROFILE_ID) == stored_attempt
+
+    # Cancelling a separate reveal prompt leaves the completed prediction intact.
+    cancelled_prompt = command_interaction()
+    asyncio.run(group.get_command("weather").callback(cancelled_prompt))
+    cancelled_view = cancelled_prompt.response.send_message.await_args.kwargs["view"]
+    cancellation = command_interaction()
+    asyncio.run(cancelled_view.cancel.callback(cancellation))
+    cancellation.response.send_message.assert_not_awaited()
+    assert prediction_repository.get(123, 456, current, PROFILE_ID) == stored_attempt
+    assert weather_repository.get(123, current, PROFILE_ID) == canonical
+
+    # A modal opened before revelation must still be rejected on later submission.
+    pending_modal = open_modal(group)
+    reveal_interaction = command_interaction()
+    asyncio.run(reveal_view.reveal.callback(reveal_interaction))
+    revealed = weather_repository.get(123, current, PROFILE_ID)
+    assert revealed.weather == canonical.weather
+    assert revealed.created_at == canonical.created_at
+    assert revealed.revealed_at is not None
+    assert "Light rain (15 vs DC 15)" in reveal_interaction.response.send_message.await_args.args[0]
+    assert dice.count == 2
+
+    blocked = asyncio.run(make_prediction(user_id=789))
+    blocked.response.send_message.assert_awaited_once_with(
+        "Predict Weather is no longer available for Sunday, 20 Pharast 4710 AR.\n"
+        "The actual weather for this campaign day has already been revealed.",
+        ephemeral=True,
+    )
+    assert prediction_repository.get(123, 789, current, PROFILE_ID) is None
+    assert weather_repository.get(123, current, PROFILE_ID) == revealed
+    assert dice.count == 2
+    stale_submission = submit(pending_modal, "20", user_id=999)
+    assert stale_submission.response.send_message.await_args == blocked.response.send_message.await_args
+    assert prediction_repository.get(123, 999, current, PROFILE_ID) is None
+
+    duplicate_after_reveal = asyncio.run(make_prediction())
+    duplicate_after_reveal.response.send_message.assert_awaited_once_with(
+        "You have already attempted Predict Weather for this campaign date.", ephemeral=True
+    )
 
 
 @pytest.mark.parametrize(
@@ -324,7 +380,7 @@ def test_discord_prediction_keeps_canonical_weather_hidden_and_reuses_it(tmp_pat
 )
 def test_modal_final_total_one_persists_concealed_critical_failure(tmp_path, conditions, dc):
     database = tmp_path / "modal-total-one.sqlite3"
-    current = CalendarDate(19, 3, 4710)
+    current = CalendarDate(20, 3, 4710)
     campaigns = SQLiteCampaignStateRepository(database)
     campaigns.save(CampaignState(123, current, party_level=4))
 
@@ -359,6 +415,7 @@ def test_modal_final_total_one_persists_concealed_critical_failure(tmp_path, con
 
     attempt = predictions.get(123, 456, current, PROFILE_ID)
     assert attempt.survival_total == 1
+    assert attempt.forecast_date == attempt.campaign_date == current
     assert attempt.conditions is conditions
     assert attempt.dc == dc
     assert attempt.degree is DegreeOfSuccess.CRITICAL_FAILURE
@@ -371,9 +428,9 @@ def test_modal_final_total_one_persists_concealed_critical_failure(tmp_path, con
         ).fetchone() == (1, conditions.value, dc, "critical_failure")
 
     interaction.response.send_message.assert_awaited_once_with(
-        "Forecast for Sunday, 20 Pharast 4710 AR\n"
+        "Weather forecast for Sunday, 20 Pharast 4710 AR\n"
         "Precipitation: No precipitation.\n"
-        "No significant weather event is expected during the coming day.\n"
+        "No significant weather event is expected during the day ahead.\n"
         "You gain a +2 circumstance bonus to Survival checks to prepare for this weather.",
         ephemeral=False,
     )
@@ -382,10 +439,10 @@ def test_modal_final_total_one_persists_concealed_critical_failure(tmp_path, con
         assert secret not in output
     assert "1" not in re.findall(r"\b\d+\b", output)
 
-    canonical = weather_repository.get(123, current.advance(), PROFILE_ID)
+    canonical = weather_repository.get(123, current, PROFILE_ID)
     assert canonical.weather.precipitation.precipitation_type is PrecipitationType.RAIN
     assert canonical.revealed_at is None
-    assert weather_service.get_or_generate(123, current.advance(), 4, PROFILE_ID) == canonical
+    assert weather_service.get_or_generate(123, current, 4, PROFILE_ID) == canonical
     assert dice.count == 2
 
     duplicate = submit(open_modal(group, conditions), "1")
@@ -393,7 +450,7 @@ def test_modal_final_total_one_persists_concealed_critical_failure(tmp_path, con
         "You have already attempted Predict Weather for this campaign date.", ephemeral=True
     )
     assert predictions.get(123, 456, current, PROFILE_ID) == attempt
-    assert weather_repository.get(123, current.advance(), PROFILE_ID) == canonical
+    assert weather_repository.get(123, current, PROFILE_ID) == canonical
     assert dice.count == 2
 
 

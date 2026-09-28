@@ -8,7 +8,7 @@ def format_prediction(attempt: PredictionAttempt) -> str:
     """Format the forecast only; never expose internal degree or false marker."""
     forecast = attempt.forecast
     target = attempt.forecast_date
-    heading = f"Forecast for {target.weekday}, {target.day} {target.month_name} {target.year} AR"
+    heading = f"Weather forecast for {target.weekday}, {target.day} {target.month_name} {target.year} AR"
 
     if attempt.degree is DegreeOfSuccess.FAILURE:
         return f"{heading}\nYou are unable to obtain a useful forecast."
@@ -25,15 +25,15 @@ def format_prediction(attempt: PredictionAttempt) -> str:
 
     if forecast.significant_event_occurs:
         if forecast.event is None:
-            lines.append("A significant weather event is expected during the coming day.")
+            lines.append("A significant weather event is expected during the day ahead.")
         else:
             lines.append(
-                f"{forecast.event.event.value} is expected during the coming day."
+                f"{forecast.event.event.value} is expected during the day ahead."
             )
             if forecast.event_gm_resolution_required:
                 lines.append("The event's hazard level requires GM resolution.")
     else:
-        lines.append("No significant weather event is expected during the coming day.")
+        lines.append("No significant weather event is expected during the day ahead.")
 
     bonus = forecast.preparation_bonus
     lines.append(

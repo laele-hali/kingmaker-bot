@@ -26,6 +26,16 @@ class WeatherService:
         self._repository = repository
         self._engines = dict(engines)
 
+    def get(
+        self, guild_id: int, date: CalendarDate, profile_id: str
+    ) -> WeatherRecord | None:
+        """Read existing weather without generation or revelation."""
+        self._validate_lookup(date, profile_id)
+        record = self._repository.get(guild_id, date, profile_id)
+        if record is not None:
+            self._validate_record_identity(record, guild_id, date, profile_id)
+        return record
+
     def get_or_generate(
         self,
         guild_id: int,
@@ -34,10 +44,8 @@ class WeatherService:
         profile_id: str,
     ) -> WeatherRecord:
         """Load canonical weather, generating and saving only when it is absent."""
-        self._validate_lookup(date, profile_id)
-        stored = self._repository.get(guild_id, date, profile_id)
+        stored = self.get(guild_id, date, profile_id)
         if stored is not None:
-            self._validate_record_identity(stored, guild_id, date, profile_id)
             return stored
 
         engine = self._engines.get(profile_id)

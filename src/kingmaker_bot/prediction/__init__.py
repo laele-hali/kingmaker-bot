@@ -3,6 +3,7 @@
 from kingmaker_bot.prediction.models import (
     DegreeOfSuccess,
     PredictionAlreadyAttemptedError,
+    PredictionWeatherRevealedError,
     PredictionAttempt,
     PredictionConditions,
     WeatherForecast,
@@ -13,6 +14,7 @@ from kingmaker_bot.prediction.repository import PredictionRepository
 __all__ = [
     "DegreeOfSuccess",
     "PredictionAlreadyAttemptedError",
+    "PredictionWeatherRevealedError",
     "PredictionAttempt",
     "PredictionConditions",
     "PredictionRepository",

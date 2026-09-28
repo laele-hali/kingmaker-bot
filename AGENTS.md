@@ -447,8 +447,8 @@ Conceptually:
 Do not design weather generation so that it can operate only on the
 campaign's current date.
 
-This is required because forecasting may need weather to be generated
-for a future date.
+The engine remains date-independent even though the current Predict Weather
+workflow targets the current campaign date.
 
 Weather generation must remain deterministic with respect to a stored
 weather result:
@@ -463,7 +463,7 @@ Explicit GM/admin reroll functionality may be added later.
 
 ## Weather Persistence
 
-Weather will eventually be persisted by campaign and Golarion date.
+Weather is persisted by guild, Golarion date, and weather profile.
 
 A stored weather record should retain enough information to explain the
 generated result and support future weather history.
@@ -471,10 +471,10 @@ generated result and support future weather history.
 Weather must be capable of existing in the database without having been
 revealed to players.
 
-Conceptually a weather record will eventually distinguish:
+A weather record distinguishes:
 
     generated weather
-    generated_at
+    created_at
     revealed_at
 
 where `revealed_at` may be null.
@@ -485,8 +485,14 @@ actual result.
 A forecast must never alter, replace, or reroll the actual stored
 weather.
 
-Do not implement weather persistence until it is part of the current
-development task.
+Generated is not revealed. Revealed means deliberately exposed through the
+public `/calendar weather` reveal workflow. The first reveal requires an
+ephemeral, invoking-user-only confirmation with Reveal Weather and Cancel.
+Opening, cancelling, or timing out a confirmation must not generate weather,
+reveal existing weather, or change prediction attempts. On confirmation,
+reuse or generate canonical weather, mark it revealed once, and publicly
+display its mechanical details. Already-revealed weather is displayed without
+confirmation, regeneration, or changing its first reveal timestamp.
 
 ---
 
@@ -528,10 +534,10 @@ Do not implement natural-weather behaviour until explicitly requested.
 
 # Predict Weather
 
-The project will eventually support the Pathfinder 2e Predict Weather
-feat.
+The project supports the Pathfinder 2e Predict Weather feat through a
+day-level campaign abstraction.
 
-The planned Discord command is:
+The Discord command is:
 
     /calendar predict
 
@@ -552,6 +558,10 @@ not directly inside the Discord command.
 A prediction must be based on the actual weather generated for the
 forecast period.
 
+New predictions target the current campaign date, normally near the start of
+the campaign day. There is no time-of-day model. Preserve readability of
+historical next-day attempts without migrating or rewriting them.
+
 If required weather has not yet been generated:
 
 1. Generate the actual weather.
@@ -561,7 +571,8 @@ If required weather has not yet been generated:
 If weather already exists:
 
 1. Retrieve the existing weather.
-2. Use it as the basis of the prediction.
+2. Reject privately if it has already been revealed, creating no attempt.
+3. Otherwise use it as the basis of the prediction without revealing it.
 
 Prediction must never cause actual weather to be rerolled.
 
@@ -571,8 +582,11 @@ by the prediction result.
 A failed or misleading prediction must not expose the true weather or
 the hidden degree of success.
 
-Where practical, the Discord response should be private/ephemeral to
-the player making the prediction.
+The Survival-total modal is private. Resolved forecasts are public, including
+failure and concealed critical failure. Submitted totals, Predict Weather DCs,
+degree labels, and false-forecast markers must remain hidden. Validation,
+duplicate-attempt, and revealed-weather errors remain private/ephemeral.
+Keep one attempt per Discord user, guild, campaign date, and profile.
 
 ---
 

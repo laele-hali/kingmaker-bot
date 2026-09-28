@@ -9,6 +9,7 @@ from kingmaker_bot.calendar import CalendarDate
 from kingmaker_bot.prediction import (
     DegreeOfSuccess,
     PredictionAlreadyAttemptedError,
+    PredictionWeatherRevealedError,
     PredictionAttempt,
     PredictionConditions,
     PredictionRepository,
@@ -42,12 +43,13 @@ class RandomFalseForecastSource:
 
 
 class PredictWeatherService:
-    """Build and persist predictions about the next campaign calendar day.
+    """Build and persist predictions about the current campaign calendar day.
 
     The PF2e feat says the forecast covers the next 24 hours. Since the
     campaign clock is day-granularity, this service explicitly approximates
-    that period as the next campaign calendar date. The one-attempt-per-day
-    rule is likewise a campaign-date approximation, not wall-clock timing.
+    that period as the current campaign date, before weather is revealed.
+    The one-attempt-per-day rule is likewise a campaign-date approximation,
+    not wall-clock timing.
     """
 
     def __init__(
@@ -85,11 +87,15 @@ class PredictWeatherService:
                 "Predict Weather has already been attempted for this campaign date."
             )
 
-        # This is the next campaign date as a day-granularity approximation of 24 hours.
-        forecast_date = current_date.advance(1)
+        forecast_date = current_date
+        # Existing records are read before generation; this call never reveals weather.
         canonical = self._weather_service.get_or_generate(
             guild_id, forecast_date, party_level, self._profile_id
         )
+        if canonical.revealed_at is not None:
+            raise PredictionWeatherRevealedError(
+                "Weather for this campaign date has already been revealed."
+            )
         degree = determine_degree_of_success(survival_total, conditions.dc)
         forecast = self._forecast(canonical.weather, degree)
         attempt = PredictionAttempt(
