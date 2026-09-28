@@ -1,4 +1,5 @@
 import pytest
+from dataclasses import replace
 
 from kingmaker_bot.calendar import CalendarDate
 from kingmaker_bot.discord_prediction_formatter import format_prediction
@@ -108,7 +109,7 @@ def test_critical_failure_formats_detailed_false_forecast_without_revealing_it()
 
     assert "No precipitation" in output
     assert "Tornado is expected during the day ahead" in output
-    assert "hazard level requires GM resolution" in output
+    assert "Ask the GM how this event affects your preparations" in output
     assert "+2 circumstance bonus" in output
     assert "critical failure" not in output.lower()
     assert "false" not in output.lower()
@@ -129,7 +130,7 @@ def test_event_hazard_resolution_is_shown_without_selecting_a_level():
     output = format_prediction(make_attempt(DegreeOfSuccess.CRITICAL_SUCCESS, forecast, 30))
 
     assert "Supernatural Storm" in output
-    assert "requires GM resolution" in output
+    assert "Ask the GM how this event affects your preparations" in output
     assert "Hazard 6" not in output
 
 
@@ -142,3 +143,16 @@ def test_all_precipitation_labels_are_formatted(precipitation):
         PrecipitationType.RAIN: "Light rain",
         PrecipitationType.SNOW: "Light snow",
     }[precipitation] in output
+
+
+def test_critical_failure_and_confident_detailed_forecast_have_identical_presentation():
+    forecast = WeatherForecast(
+        PrecipitationType.RAIN, None, True,
+        WeatherEventDefinition(WeatherEvent.TORNADO, HazardLevel(choices=(12, 17))),
+        2, event_gm_resolution_required=True,
+    )
+    accurate = make_attempt(DegreeOfSuccess.CRITICAL_SUCCESS, forecast, 30)
+    false = make_attempt(DegreeOfSuccess.CRITICAL_FAILURE, replace(forecast, is_false=True), 1)
+    assert format_prediction(accurate) == format_prediction(false)
+    assert "+2 circumstance bonus" in format_prediction(false)
+    assert "Ask the GM how this event affects your preparations." in format_prediction(false)

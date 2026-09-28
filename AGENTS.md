@@ -491,8 +491,21 @@ ephemeral, invoking-user-only confirmation with Reveal Weather and Cancel.
 Opening, cancelling, or timing out a confirmation must not generate weather,
 reveal existing weather, or change prediction attempts. On confirmation,
 reuse or generate canonical weather, mark it revealed once, and publicly
-display its mechanical details. Already-revealed weather is displayed without
+display its weather results and relevant gameplay information. Already-revealed weather is displayed without
 confirmation, regeneration, or changing its first reveal timestamp.
+
+Discord presentation must separate RESULT from GENERATION MECHANICS.
+Public weather output shows weather results and required gameplay effects.
+Raw generation rolls, generation DCs, event-table roll values, discarded candidates,
+reroll machinery, and secret prediction mechanics remain internal. Preserve
+all generation metadata in domain models and persistence.
+
+Resolved hazard levels and forecast preparation bonuses may be displayed as
+gameplay information. Unresolved hazard choices or additional weather effects
+should use a minimal request for GM adjudication without exposing the internal
+selection process. Do not invent GM-only permissions or a separate GM command.
+Private confirmations and errors must also use natural player-facing language;
+never forward raw exception text or database details to Discord.
 
 ---
 

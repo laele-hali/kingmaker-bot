@@ -33,7 +33,7 @@ class RevealWeatherView(discord.ui.View):
         date = self._date
         return (
             f"Reveal weather for {date.weekday}, {date.day} {date.month_name} {date.year} AR?\n\n"
-            "This will reveal the day's actual weather and mechanical details to everyone "
+            "This will reveal the day's actual weather and gameplay information to everyone "
             "in this channel.\n\n"
             "Once revealed, Predict Weather can no longer be attempted for this campaign day."
         )
@@ -91,7 +91,7 @@ class RevealWeatherView(discord.ui.View):
                     raise RuntimeError("weather disappeared before reveal")
         except Exception:
             await interaction.response.send_message(
-                "Weather could not be generated or loaded. Please try again later.", ephemeral=True
+                "The weather could not be displayed. Please try again later.", ephemeral=True
             )
             return
         # A new public interaction response, not an edit to the private prompt.

@@ -1,4 +1,5 @@
 import asyncio
+import re
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -158,7 +159,7 @@ def test_weather_failure_is_not_exposed_to_discord(tmp_path) -> None:
     view, _ = open_confirmation(group)
     interaction = press(view, "Reveal Weather")
     assert interaction.response.send_message.await_args.args[0] == (
-        "Weather could not be generated or loaded. Please try again later."
+        "The weather could not be displayed. Please try again later."
     )
     assert interaction.response.send_message.await_args.kwargs["ephemeral"] is True
 
@@ -253,3 +254,45 @@ def test_two_pending_reveals_share_weather_and_first_timestamp(tmp_path):
     repeated = press(first, "Reveal Weather")
     assert repeated.response.send_message.await_args.kwargs["ephemeral"] is True
     assert repository.get(111, date, PROFILE_ID) == revealed
+
+
+@pytest.mark.parametrize(
+    ("date", "rolls", "expected"),
+    [
+        (CalendarDate(23, 3, 4710), (14, 16), "Precipitation: No precipitation"),
+        (CalendarDate(23, 3, 4710), (16, 15), "Precipitation: Light rain"),
+        (CalendarDate(23, 1, 4710), (8, 18, 16), "Temperature: Mild Cold"),
+        (CalendarDate(23, 3, 4710), (15, 17, 10), "Windstorm, Hazard 1"),
+        (CalendarDate(23, 3, 4710), (15, 17, 17), "Significant weather: Wildfire"),
+        (CalendarDate(23, 3, 4710), (15, 20, 15, 20), "additional weather effects"),
+    ],
+)
+def test_public_reveal_and_repeat_never_expose_generation_checks(tmp_path, date, rolls, expected):
+    campaigns, dice, group = services(tmp_path, values=rolls)
+    campaigns.save(CampaignState(111, date, party_level=3))
+    view, prompt = open_confirmation(group)
+    assert dice.count == 0
+    assert "gameplay information" in prompt
+    for secret in ("DC", "roll", "canonical", "record", "generated", "revealed_at"):
+        assert secret not in prompt
+    revealed = press(view, "Reveal Weather")
+    output = revealed.response.send_message.await_args.args[0]
+    assert revealed.response.send_message.await_args.kwargs["ephemeral"] is False
+    assert expected in output
+    for secret in (
+        "dc", "roll", "check", "is_false", "critical failure", "degree", "success",
+        "kingmaker_stolen_lands", "canonical", "revealed_at", "event_table", "survival",
+    ):
+        assert secret not in output.lower()
+    body = re.sub(r"Hazard \d+", "", output.split("\n", 1)[1])
+    assert re.findall(r"\d+", body) == []
+    again = command_interaction()
+    asyncio.run(group.get_command("weather").callback(again))
+    assert again.response.send_message.await_args.args[0] == output
+    assert dice.count == len(rolls)
+
+    # Presentation filtering leaves the stored audit data intact.
+    record = SQLiteWeatherRepository(tmp_path / "state.sqlite3").get(111, date, PROFILE_ID)
+    assert record.weather.precipitation.roll == rolls[0]
+    assert record.weather.precipitation.dc == (8 if date.month == 1 else 15)
+    assert record.weather.significant_event_check.dc == 17

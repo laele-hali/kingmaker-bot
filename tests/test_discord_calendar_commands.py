@@ -1,5 +1,5 @@
 import asyncio
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -47,3 +47,27 @@ def test_date_command_handles_context_without_guild() -> None:
     interaction.response.send_message.assert_awaited_once_with(
         "Calendar commands can only be used in a server.", ephemeral=True
     )
+
+
+@pytest.mark.parametrize(
+    ("command", "method", "args", "message"),
+    [
+        ("set", "set_date", (32, 3, 4710),
+         "Enter a valid Golarion date with a positive year, a month from 1 to 12, "
+         "and a day that exists in that month."),
+        ("advance", "advance", (-1,), "Enter a positive whole number of days to advance."),
+        ("level", "set_party_level", (21,), "Party level must be between 1 and 20."),
+    ],
+)
+def test_validation_messages_do_not_forward_exception_text(command, method, args, message):
+    service = Mock()
+    getattr(service, method).side_effect = ValueError(
+        "internal database state: check_dc=20 survival_total=19 is_false=True"
+    )
+    group = register_calendar_commands(FakeTree(), service)
+    interaction = AsyncMock()
+    interaction.guild_id = 111
+
+    asyncio.run(group.get_command(command).callback(interaction, *args))
+
+    interaction.response.send_message.assert_awaited_once_with(message, ephemeral=True)

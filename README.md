@@ -55,7 +55,9 @@ The current profile is `kingmaker_stolen_lands`. The profile-driven engine imple
 
 Weather is generated for an explicit date and stored canonically by guild, date, and profile. Repeated requests return the stored result rather than rerolling it, including after party-level changes. Date changes alone do not generate weather for elapsed days.
 
-Generated does not mean revealed. Stored records distinguish these states through `created_at` and nullable `revealed_at`. Predict Weather can generate the current campaign day's weather invisibly. `/calendar weather` requires private confirmation before the first public reveal of actual conditions and mechanical details. Opening the confirmation, cancelling it, or letting it expire does not generate or reveal weather. Confirming reuses hidden weather or generates it if absent; further predictions for that date are then blocked. Already-revealed weather is displayed again without confirmation, rerolling, or changing the first reveal timestamp.
+Generated does not mean revealed. Stored records distinguish these states through `created_at` and nullable `revealed_at`. Predict Weather can generate the current campaign day's weather invisibly. `/calendar weather` requires private confirmation before the first public reveal of actual conditions and relevant gameplay information. Opening the confirmation, cancelling it, or letting it expire does not generate or reveal weather. Confirming reuses hidden weather or generates it if absent; further predictions for that date are then blocked. Already-revealed weather is displayed again without confirmation, rerolling, or changing the first reveal timestamp.
+
+Discord shows weather results, event names, resolved hazard levels, and brief prompts for necessary GM adjudication. Raw generation rolls/DCs, event-table choices, and reroll machinery remain internal and persisted. Unresolved hazard alternatives are not presented as settled gameplay results.
 
 ### Predict Weather
 
@@ -80,7 +82,7 @@ All `/calendar` commands operate in a server. Arguments shown below are Discord 
 | `/calendar set day:<integer> month:<integer> year:<integer>` | Create or update the campaign date; month is 1–12. |
 | `/calendar advance days:<integer>` | Advance a configured calendar by a positive number of days. |
 | `/calendar level [level:<integer>]` | Show party level, or set it to 1–20 on a configured campaign. |
-| `/calendar weather` | Privately confirm the first public reveal of actual current-day weather, rolls/DCs, hazards, and GM-resolution notes; display already-revealed weather directly. |
+| `/calendar weather` | Privately confirm the first public reveal of actual current-day weather and relevant gameplay information; display already-revealed weather directly. Generation rolls/DCs stay hidden. |
 | `/calendar predict conditions:<choice>` | Open the Survival-total modal and forecast the current campaign date's unrevealed weather. |
 
 Prediction choices are **Good visibility / commanding view**, **Normal conditions**, and **Poor visibility**.

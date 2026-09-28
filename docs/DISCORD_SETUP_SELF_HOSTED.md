@@ -105,7 +105,7 @@ Use the slash-command option fields shown below in your server:
 | 3 | `/calendar level level:4` | Sets party level to 4; use your party's level from 1–20. |
 | 4 | `/calendar weather` | Shows a private first-reveal confirmation. Select **Reveal Weather** to publicly display actual weather; **Cancel** changes nothing. Already-revealed weather displays directly. |
 
-Calendar state is independent for each Discord server. Party level is required for weather hazard handling. Confirmed `/calendar weather` output includes world-weather rolls and DCs and is public within its channel. Choose the channel deliberately: any confirmed reveal prevents further predictions for that campaign date. For play, forecasting, and advancing the date, continue to the [User Guide](USER_GUIDE.md).
+Calendar state is independent for each Discord server. Party level is required for weather hazard handling. Confirmed `/calendar weather` output shows actual weather and relevant gameplay information publicly within its channel; generation rolls and DCs remain hidden. Choose the channel deliberately: any confirmed reveal prevents further predictions for that campaign date. For play, forecasting, and advancing the date, continue to the [User Guide](USER_GUIDE.md).
 
 ## 9. Persistence and backups
 

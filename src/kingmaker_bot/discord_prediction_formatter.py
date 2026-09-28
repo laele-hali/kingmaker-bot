@@ -31,7 +31,7 @@ def format_prediction(attempt: PredictionAttempt) -> str:
                 f"{forecast.event.event.value} is expected during the day ahead."
             )
             if forecast.event_gm_resolution_required:
-                lines.append("The event's hazard level requires GM resolution.")
+                lines.append("Ask the GM how this event affects your preparations.")
     else:
         lines.append("No significant weather event is expected during the day ahead.")
 

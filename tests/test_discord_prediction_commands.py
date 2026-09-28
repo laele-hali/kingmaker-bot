@@ -350,7 +350,10 @@ def test_discord_prediction_then_weather_reveal_blocks_further_predictions(tmp_p
     assert revealed.weather == canonical.weather
     assert revealed.created_at == canonical.created_at
     assert revealed.revealed_at is not None
-    assert "Light rain (15 vs DC 15)" in reveal_interaction.response.send_message.await_args.args[0]
+    weather_output = reveal_interaction.response.send_message.await_args.args[0]
+    assert "Precipitation: Light rain" in weather_output
+    assert "vs DC" not in weather_output
+    assert "15" not in weather_output
     assert dice.count == 2
 
     blocked = asyncio.run(make_prediction(user_id=789))
@@ -486,7 +489,11 @@ def test_all_resolved_forecasts_are_public_without_check_or_degree_details(condi
     response = interaction.response.send_message.await_args
     assert response.kwargs["ephemeral"] is False
     output = response.args[0]
-    for secret in ("dc", "success", "failure", "false", "check total"):
+    for secret in (
+        "dc", "success", "failure", "false", "check total", "roll",
+        "canonical", "profile", "revealed_at", "created_at", "event_table",
+        "commanding_view", "normal", "poor", "degree",
+    ):
         assert secret not in output.lower()
     assert str(total) not in re.findall(r"\b\d+\b", output)
     assert str(conditions.dc) not in re.findall(r"\b\d+\b", output)

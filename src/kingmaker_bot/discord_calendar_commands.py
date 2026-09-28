@@ -156,8 +156,11 @@ def register_calendar_commands(
 
         try:
             state = service.set_date(guild_id, day, month, year)
-        except ValueError as error:
-            await interaction.response.send_message(f"Invalid Golarion date: {error}", ephemeral=True)
+        except ValueError:
+            await interaction.response.send_message(
+                "Enter a valid Golarion date with a positive year, a month from 1 to 12, "
+                "and a day that exists in that month.", ephemeral=True
+            )
             return
         await interaction.response.send_message(
             f"Campaign date set to {format_calendar_date(state.current_date)}."
@@ -171,8 +174,10 @@ def register_calendar_commands(
 
         try:
             state = service.advance(guild_id, days)
-        except ValueError as error:
-            await interaction.response.send_message(str(error), ephemeral=True)
+        except ValueError:
+            await interaction.response.send_message(
+                "Enter a positive whole number of days to advance.", ephemeral=True
+            )
             return
 
         if state is None:
@@ -197,8 +202,10 @@ def register_calendar_commands(
         else:
             try:
                 state = service.set_party_level(guild_id, level)
-            except ValueError as error:
-                await interaction.response.send_message(str(error), ephemeral=True)
+            except ValueError:
+                await interaction.response.send_message(
+                    "Party level must be between 1 and 20.", ephemeral=True
+                )
                 return
             if state is None:
                 response = _CALENDAR_NOT_CONFIGURED
@@ -228,7 +235,7 @@ def register_calendar_commands(
         except Exception:
             # Discord receives no database or engine details; application layers retain their errors.
             await interaction.response.send_message(
-                "Weather could not be generated or loaded. Please try again later.", ephemeral=True
+                "The weather could not be displayed. Please try again later.", ephemeral=True
             )
             return
         if stored is not None and stored.revealed_at is not None:
