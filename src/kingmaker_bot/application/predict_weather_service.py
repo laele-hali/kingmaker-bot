@@ -81,6 +81,13 @@ class PredictWeatherService:
     ) -> PredictionAttempt:
         """Record an attempt; canonical generated weather remains unrevealed."""
         self._validate_input(guild_id, user_id, current_date, party_level, survival_total, conditions)
+        # Public revelation takes precedence over per-user usage. Read only here:
+        # a duplicate (including a legacy attempt) must not generate weather.
+        stored = self._weather_service.get(guild_id, current_date, self._profile_id)
+        if stored is not None and stored.revealed_at is not None:
+            raise PredictionWeatherRevealedError(
+                "Weather for this campaign date has already been revealed."
+            )
         existing = self._repository.get(guild_id, user_id, current_date, self._profile_id)
         if existing is not None:
             raise PredictionAlreadyAttemptedError(

@@ -31,7 +31,7 @@ def test_calendar_command_group_is_guild_only_and_registers_subcommands() -> Non
     assert isinstance(group, app_commands.Group)
     assert group.guild_only
     assert {command.name for command in group.commands} == {
-        "date", "set", "advance", "level", "weather", "predict"
+        "date", "set", "advance", "level", "weather", "weather-gm", "predict"
     }
     assert tree.commands == [group]
 

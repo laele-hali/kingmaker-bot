@@ -370,9 +370,10 @@ def test_discord_prediction_then_weather_reveal_blocks_further_predictions(tmp_p
     assert prediction_repository.get(123, 999, current, PROFILE_ID) is None
 
     duplicate_after_reveal = asyncio.run(make_prediction())
-    duplicate_after_reveal.response.send_message.assert_awaited_once_with(
-        "You have already attempted Predict Weather for this campaign date.", ephemeral=True
-    )
+    assert duplicate_after_reveal.response.send_message.await_args == blocked.response.send_message.await_args
+    assert prediction_repository.get(123, 456, current, PROFILE_ID) == stored_attempt
+    assert weather_repository.get(123, current, PROFILE_ID) == revealed
+    assert dice.count == 2
 
 
 @pytest.mark.parametrize(

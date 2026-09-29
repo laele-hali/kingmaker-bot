@@ -1,4 +1,4 @@
-# Kingmaker Bot v1.0.1
+# Kingmaker Bot v1.0.2
 
 Kingmaker Bot is a Discord campaign utility for Pathfinder 2e, designed to make calendar and weather management feel like part of the game rather than bookkeeping. It currently provides a persistent Golarion calendar, Kingmaker Stolen Lands weather generation, and player-facing Predict Weather forecasts.
 
@@ -18,7 +18,7 @@ New to Kingmaker Bot? The current release is self-hosted: you create your own Di
 ### Using the Bot
 
 - [User Guide](docs/USER_GUIDE.md) — Commands and table use for players and GMs.
-- [Changelog](CHANGELOG.md) — Release history, including the v1.0.1 rewind bugfix.
+- [Changelog](CHANGELOG.md) — Release history, including v1.0.2 private GM weather inspection.
 
 ### Integrations
 
@@ -34,6 +34,8 @@ New to Kingmaker Bot? The current release is self-hosted: you create your own Di
 - [GitHub repository](https://github.com/laele-hali/kingmaker-bot)
 
 ## v1.0.0 — Stable core calendar and weather release
+
+v1.0.2 adds `/calendar weather-gm`: private inspection of actual current-day weather, generating or reusing the canonical result without revealing it or preventing Predict Weather. It is intended for the GM, but access is not restricted by a GM permission check. See the [inspection guide](docs/USER_GUIDE.md#privately-inspect-actual-weather).
 
 v1.0.1 fixes campaign-date rewinds: backwards `/calendar set` requires private confirmation and permanently discards weather and predictions on and after the target date. Earlier weather and predictions wholly before that date are preserved. Forward and same-date setting preserve all data. See the [rewind guide](docs/USER_GUIDE.md#correcting-the-campaign-date).
 
@@ -94,6 +96,7 @@ All `/calendar` commands operate in a server. Arguments shown below are Discord 
 | `/calendar advance days:<integer>` | Advance a configured calendar by a positive number of days. |
 | `/calendar level [level:<integer>]` | Show party level, or set it to 1–20 on a configured campaign. |
 | `/calendar weather` | Privately confirm the first public reveal of actual current-day weather and relevant gameplay information; display already-revealed weather directly. Generation rolls/DCs stay hidden. |
+| `/calendar weather-gm` | GM: privately inspect actual current-day weather without revealing it or blocking Predict Weather. Generates only if absent; generation mechanics stay hidden. |
 | `/calendar predict conditions:<choice>` | Open the Survival-total modal and forecast the current campaign date's unrevealed weather. |
 
 Prediction choices are **Good visibility / commanding view**, **Normal conditions**, and **Poor visibility**.

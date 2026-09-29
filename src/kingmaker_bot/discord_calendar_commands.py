@@ -258,6 +258,42 @@ def register_calendar_commands(
         )
         await interaction.response.send_message(view.confirmation, view=view, ephemeral=True)
 
+    @group.command(name="weather-gm", description="GM: privately inspect actual weather without revealing it")
+    async def weather_gm(interaction: discord.Interaction) -> None:
+        guild_id = await _guild_id_or_respond(interaction)
+        if guild_id is None:
+            return
+        try:
+            state = service.get_campaign_state(guild_id)
+            if state is None:
+                await interaction.response.send_message(_CALENDAR_NOT_CONFIGURED, ephemeral=True)
+                return
+            if state.party_level is None:
+                await interaction.response.send_message(
+                    "No party level is configured. Set one with /calendar level <level>.",
+                    ephemeral=True,
+                )
+                return
+            if weather_service is None:
+                await interaction.response.send_message("Weather is temporarily unavailable.", ephemeral=True)
+                return
+            # Inspection may generate canonical weather, but must never reveal it.
+            stored = weather_service.get_or_generate(
+                guild_id, state.current_date, state.party_level, PROFILE_ID
+            )
+            status = (
+                "this weather has not been revealed to the group."
+                if stored.revealed_at is None
+                else "this weather has already been revealed."
+            )
+            output = f"Actual weather — {format_weather(stored.weather)}\n\nGM view — {status}"
+        except Exception:
+            await interaction.response.send_message(
+                "The weather could not be displayed. Please try again later.", ephemeral=True
+            )
+            return
+        await interaction.response.send_message(output, ephemeral=True)
+
     @group.command(name="predict", description="Predict weather for the current campaign date")
     @app_commands.choices(
         conditions=[

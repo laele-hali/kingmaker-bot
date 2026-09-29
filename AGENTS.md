@@ -17,6 +17,8 @@ the current task explicitly requests a behavioral change:
 
 - Canonical weather is generated once and reused.
 - Generated weather is not automatically revealed.
+- GM inspection != reveal. Private `/calendar weather-gm` may generate/reuse
+  canonical weather but must never set `revealed_at` or prevent Predict Weather.
 - Predict Weather targets the current campaign date without revealing actual weather.
 - The first actual-weather reveal is deliberate and requires confirmation.
 - Public Discord output shows results/gameplay information, not generation machinery.
@@ -520,7 +522,9 @@ all generation metadata in domain models and persistence.
 Resolved hazard levels and forecast preparation bonuses may be displayed as
 gameplay information. Unresolved hazard choices or additional weather effects
 should use a minimal request for GM adjudication without exposing the internal
-selection process. Do not invent GM-only permissions or a separate GM command.
+selection process. `/calendar weather-gm` uses the same result information privately;
+it must not expose generation machinery. It is intended for GM use without
+GM-only permission enforcement.
 Private confirmations and errors must also use natural player-facing language;
 never forward raw exception text or database details to Discord.
 
@@ -666,6 +670,7 @@ Implemented calendar interactions include:
     /calendar advance
     /calendar level
     /calendar weather
+    /calendar weather-gm
     /calendar predict
 
 Preserve established command behavior unless the current task requests changes.

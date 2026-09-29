@@ -300,3 +300,40 @@ def test_legacy_next_day_attempt_still_blocks_duplicate_without_generating_weath
 
     assert dice.consumed == 0
     assert predictions.get(123, 456, current, PROFILE_ID) == legacy
+
+
+@pytest.mark.parametrize("revealed", [False, True])
+@pytest.mark.parametrize("previous_user", [None, 456, 789])
+def test_revelation_takes_precedence_over_previous_attempt(tmp_path, revealed, previous_user):
+    import sqlite3
+
+    service, predictions, weather, dice = service_bundle(tmp_path)
+    date = CalendarDate(20, 3, 4710)
+    weather.get_or_generate(123, date, 4, PROFILE_ID)
+    previous = None
+    if previous_user is not None:
+        previous = service.predict(123, previous_user, date, 4, 20, PredictionConditions.NORMAL)
+    if revealed:
+        weather.reveal(123, date, PROFILE_ID)
+    canonical = weather.get(123, date, PROFILE_ID)
+
+    expected_error = (
+        PredictionWeatherRevealedError if revealed
+        else PredictionAlreadyAttemptedError if previous_user == 456
+        else None
+    )
+    if expected_error:
+        with pytest.raises(expected_error):
+            service.predict(123, 456, date, 4, 20, PredictionConditions.NORMAL)
+    else:
+        attempt = service.predict(123, 456, date, 4, 20, PredictionConditions.NORMAL)
+        assert attempt.forecast.precipitation == canonical.weather.precipitation.precipitation_type
+
+    with sqlite3.connect(tmp_path / "predict.sqlite3") as connection:
+        assert connection.execute("SELECT COUNT(*) FROM prediction_attempt").fetchone()[0] == (
+            int(previous_user is not None) + int(expected_error is None)
+        )
+    if previous is not None:
+        assert predictions.get(123, previous_user, date, PROFILE_ID) == previous
+    assert weather.get(123, date, PROFILE_ID) == canonical
+    assert dice.consumed == 2

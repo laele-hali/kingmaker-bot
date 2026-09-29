@@ -39,6 +39,7 @@ Only one Predict Weather attempt is allowed per user per campaign date. For your
 | `/calendar level` | View the configured party level. |
 | `/calendar level level:4` | Set party level to 4; allowed levels are 1–20. Configure the calendar first. |
 | `/calendar weather` | Request a private confirmation before first revealing the current day's actual weather and relevant gameplay information. Requires party level. |
+| `/calendar weather-gm` | Privately inspect actual current-day weather without revealing it or preventing Predict Weather. Requires calendar and party level. Intended for the GM; access is not technically restricted to GMs. |
 | `/calendar predict` | A player selects conditions and submits their final Survival total for a current-day forecast, before weather is revealed. Requires calendar and party-level configuration. |
 
 Months 1–12 are Abadius, Calistril, Pharast, Gozran, Desnus, Sarenith, Erastus, Arodus, Rova, Lamashan, Neth, and Kuthona. Dates use Absalom Reckoning, with leap years every eight years. Party level is used for weather hazard handling; updating it does not reroll existing weather.
@@ -55,6 +56,16 @@ For example, rewinding to 17 Pharast removes weather and predictions for 17 Phar
 
 Only the invoking user can confirm or cancel. Opening the warning, cancelling, or letting its five-minute timeout expire changes nothing. If campaign settings change while the warning is open, including another date set or party-level change, run `/calendar set` again for a fresh confirmation. Confirmed date changes are announced publicly. Previously posted Discord messages are not removed.
 
+### Privately inspect actual weather
+
+Run `/calendar weather-gm` to see the current day's actual weather privately, for example to compare it yourself with a player's forecast. The response is ephemeral: only the invoking user sees it. This command is intended for the GM, but the bot does not technically prevent players from invoking it.
+
+If weather is absent, inspection generates and saves the day's canonical weather. Otherwise it reuses the exact stored result without rerolling. **GM inspection is not a reveal:** it never changes the reveal timestamp, campaign date, party level, or prediction attempts. The response says whether the weather has already been revealed and shows weather results and gameplay information without generation rolls or DCs.
+
+You can inspect before or after players use Predict Weather. Both use the same hidden canonical weather, and inspection leaves predictions available. Later, `/calendar weather` still requires deliberate confirmation to publicly reveal that same weather. Inspecting already-revealed weather is private and read-only; it does not restore prediction eligibility.
+
+The spelling is `/calendar weather-gm` because Discord cannot make `/calendar weather` both executable and a group with a `gm` subcommand. The established public command remains unchanged. Inspection does not display previous forecasts or comparison reports.
+
 ### Deliberately reveal actual weather
 
 The confirmation prevents accidental disclosure of the actual weather. The public report shows results and relevant gameplay information, not how the bot generated them.
@@ -68,18 +79,18 @@ The confirmation prevents accidental disclosure of the actual weather. The publi
 
 ### World weather versus character forecasts
 
-| | `/calendar weather` | `/calendar predict` |
-| --- | --- | --- |
-| Information | GM/world information for the current day | Character-facing forecast for the current campaign date |
-| Gameplay information | Weather results and resolved hazard levels; no generation rolls/DCs | Preparation bonus when applicable; no Predict Weather DC, submitted total, or degree labels |
-| Visibility | First confirmation private; actual weather public within the invoking channel | Resolved forecasts public; validation and duplicate errors private |
-| Effect on actual weather | Only confirmation generates/reuses and marks it revealed; repeat display changes nothing | Retrieves/generates without marking it revealed |
+| | `/calendar weather` | `/calendar weather-gm` | `/calendar predict` |
+| --- | --- | --- | --- |
+| Information | Actual current-day weather | Actual current-day weather for GM inspection | Character-facing forecast for the current campaign date |
+| Gameplay information | Weather results and resolved hazard levels; no generation rolls/DCs | Same weather results; no generation rolls/DCs | Preparation bonus when applicable; no Predict Weather DC, submitted total, or degree labels |
+| Visibility | First confirmation private; actual weather public within the invoking channel | Ephemeral to the invoking user | Resolved forecasts public; validation and duplicate errors private |
+| Effect on actual weather | Only confirmation generates/reuses and marks it revealed; repeat display changes nothing | Generates/reuses without revealing; predictions remain available if unrevealed | Retrieves/generates without marking it revealed |
 
 The bot treats generated weather as **canonical**. Once weather has been generated for a date, that result becomes the actual weather for that day and is not rerolled. Predict Weather may generate the current day's canonical weather invisibly, or reuse an existing hidden record. `/calendar weather` later reveals that same result rather than rerolling it. Once revealed, Predict Weather is no longer available for that campaign date; rejection is private and creates no attempt. Advancing the date does not itself reveal or generate weather.
 
 This models the feat's next-24-hours forecast as a start-of-day forecast for the current campaign date; the bot does not track time of day.
 
-Generation rolls, DCs, and selection metadata are retained internally. If a hazard level or additional weather effects remain undecided, the public report asks for GM adjudication without showing candidate levels, checks, or reroll details. Consult the published rules for the required decision; there is no separate GM-only Discord report.
+Generation rolls, DCs, and selection metadata are retained internally. If a hazard level or additional weather effects remain undecided, the report asks for GM adjudication without showing candidate levels, checks, or reroll details. Consult the published rules for the required decision; private GM inspection does not expose these mechanics either.
 
 ### Secret-check behavior
 

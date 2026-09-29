@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.2
+
+Small workflow release adding private GM inspection of canonical weather.
+
+- `/calendar weather-gm` generates or reuses actual current-day weather and displays it only to the invoking user.
+- GM inspection is not revelation: it never changes `revealed_at`, consumes a prediction attempt, or blocks Predict Weather. Later public revelation uses the same canonical weather.
+- The existing `/calendar weather` confirmation and public reveal remain unchanged. Discord cannot make `weather` both executable and a group containing `gm`, so inspection is a separate command.
+- Intended for GM use; no GM-only permission enforcement. Results hide generation machinery, including in the private view.
+- No schema migration or history/reporting functionality.
+- Predict Weather prioritizes the revealed-weather rejection even when the user already predicted that day; hidden-weather duplicate attempts retain their usual rejection.
+
 ## 1.0.1
 
 Bugfix release for campaign-date rewinds.
